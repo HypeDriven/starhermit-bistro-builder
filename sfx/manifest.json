@@ -1,0 +1,92 @@
+[
+  {
+    "name": "ui-tap",
+    "seconds": 1,
+    "prompt": "Short soft wooden button tap, a gentle dry click for interface confirmation.",
+    "event": "ui"
+  },
+  {
+    "name": "order-noted",
+    "seconds": 1,
+    "prompt": "Quick pencil scribble tick on a paper notepad ending with a small paper rustle.",
+    "event": "cmd"
+  },
+  {
+    "name": "guest-arrive",
+    "seconds": 2,
+    "prompt": "Small brass bell above a cafe door jingling as the wooden door swings open.",
+    "event": "spawn"
+  },
+  {
+    "name": "chair-scrape",
+    "seconds": 1,
+    "prompt": "Brief wooden chair scrape on floorboards followed by a soft sit-down thump.",
+    "event": "seat"
+  },
+  {
+    "name": "dish-ready-bell",
+    "seconds": 1,
+    "prompt": "Bright metallic kitchen service bell ding struck once on a pass counter.",
+    "event": "dish-ready"
+  },
+  {
+    "name": "tray-pickup",
+    "seconds": 1,
+    "prompt": "Ceramic plates lifted onto a wooden serving tray with a light clatter.",
+    "event": "pickup"
+  },
+  {
+    "name": "plate-serve",
+    "seconds": 1,
+    "prompt": "A ceramic plate set down gently on a wooden bistro table with a soft clink of cutlery.",
+    "event": "serve"
+  },
+  {
+    "name": "door-slam",
+    "seconds": 1,
+    "prompt": "A wooden cafe door slammed shut, glass pane rattling in the frame.",
+    "event": "leave-angry"
+  },
+  {
+    "name": "guest-thanks",
+    "seconds": 2,
+    "prompt": "Cheerful coin purse jingle with a contented satisfied hum as a guest departs.",
+    "event": "leave-happy"
+  },
+  {
+    "name": "cash-register",
+    "seconds": 2,
+    "prompt": "Vintage mechanical cash register cha-ching with bell ring and drawer slide.",
+    "event": "buy"
+  },
+  {
+    "name": "error-buzz",
+    "seconds": 1,
+    "prompt": "Short dull muted buzzer thud, a soft wrong-answer buzz.",
+    "event": "invalid"
+  },
+  {
+    "name": "day-complete-fanfare",
+    "seconds": 3,
+    "prompt": "Small celebratory brass fanfare with clinking glasses and a cheerful crowd murmur swell.",
+    "event": "win"
+  },
+  {
+    "name": "day-missed",
+    "seconds": 2,
+    "prompt": "Soft descending disappointed horn phrase, low and deflating like a sad trombone.",
+    "event": "lose"
+  },
+  {
+    "name": "rewind-swoosh",
+    "seconds": 1,
+    "prompt": "Quick airy whoosh of paper pages flipping rapidly backward.",
+    "event": "undo"
+  },
+  {
+    "name": "hint-sparkle",
+    "seconds": 1,
+    "prompt": "Gentle magical sparkle glissando of tiny bells twinkling upward.",
+    "event": "hint"
+  }
+]
