@@ -23,12 +23,15 @@ import * as BBRender from './render.js';
 
   // ---------- host API (same-origin /api when hosted; offline-safe) ----------
   var serverOffsetMs = null; // round-trip-adjusted server time offset
+  var staticPlatformHost = /^[0-9a-f-]{36}\.starhermit\.com$/i.test(location.hostname);
   function apiGet(path) {
+    if (staticPlatformHost) return Promise.resolve({ ok: false, body: { error: 'offline' } });
     return fetch(path, { headers: { 'Accept': 'application/json' } })
       .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); })
       .catch(function () { return { ok: false, body: { error: 'offline' } }; });
   }
   function apiPost(path, payload) {
+    if (staticPlatformHost) return Promise.resolve({ ok: false, body: { error: 'offline' } });
     return fetch(path, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
