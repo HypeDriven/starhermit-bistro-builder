@@ -86,7 +86,7 @@ button, select, input { font: inherit; color: inherit; }
 .clock.low { color: var(--danger); font-weight: 700; }
 
 /* ---------- main layout ---------- */
-.stage { flex: 1; display: flex; min-height: 0; position: relative; }
+.stage { flex: 1; display: flex; min-height: 0; position: relative; overflow: hidden; }
 .rail {
   background: var(--panel); overflow-y: auto; padding: .8em;
   display: flex; flex-direction: column; gap: .6em;
@@ -212,12 +212,13 @@ button, select, input { font: inherit; color: inherit; }
 @media (max-width: 1023px) {
   .rail {
     position: absolute; top: 0; bottom: 0; z-index: 18; width: min(300px, 84vw);
-    transition: transform .22s ease;
+    transition: transform .22s ease, visibility .22s ease;
     box-shadow: 0 0 24px #000a;
+    visibility: hidden;
   }
   .rail.left { left: 0; transform: translateX(-102%); }
   .rail.right { right: 0; transform: translateX(102%); }
-  .rail.open { transform: none; }
+  .rail.open { transform: none; visibility: visible; }
   .drawer-btn { display: inline-flex; }
   body.reduced-motion .rail { transition: none; }
 }
