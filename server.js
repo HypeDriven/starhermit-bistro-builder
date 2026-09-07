@@ -19,7 +19,9 @@ const C = require('./js/content.js');
 
 const ROOT = __dirname;
 const PORT = process.env.PORT || 8080;
-const DATA_DIR = path.join(ROOT, 'data');
+const DATA_DIR = process.env.BISTRO_DATA_DIR
+  ? path.resolve(process.env.BISTRO_DATA_DIR)
+  : path.join(ROOT, 'data');
 const SCORES_FILE = path.join(DATA_DIR, 'scores.json');
 const MAX_BODY = 256 * 1024;
 const MAX_TICKS = 120000; // absolute simulation bound for replays
@@ -109,6 +111,7 @@ function replayEnvelope(env) {
 }
 
 function json(res, code, obj) {
+  if (res.destroyed || res.writableEnded) return; // socket died mid-read (e.g. oversized body)
   const body = JSON.stringify(obj);
   res.writeHead(code, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
   res.end(body);

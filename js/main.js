@@ -179,7 +179,7 @@ import * as BBRender from './render.js';
     game = {
       state: state, cfg: cfg, mode: mode, lesson: lesson || null,
       commands: [], hashes: [{ tick: 0, hash: R.hashState(state) }],
-      cmdIds: {}, undoStack: [], over: false, paused: false,
+      cmdIds: {}, cmdSeq: 0, undoStack: [], over: false, paused: false,
       acc: 0, lastFrame: performance.now(), prev: null,
       startedAt: nowMs(), invalidCount: 0, speed: Number(settings.speed) || 1,
       replayT0: Date.now()
@@ -215,7 +215,7 @@ import * as BBRender from './render.js';
         i++;
         setTimeout(next, settings.reducedMotion ? 200 : 640);
       } else {
-        game.paused = false;
+        if (!screenEl) game.paused = false; // a pause menu opened during the countdown stays paused
         game.lastFrame = performance.now();
         done();
       }
@@ -224,7 +224,7 @@ import * as BBRender from './render.js';
 
   function dispatch(cmd, silent) {
     if (!game || game.over || game.paused) return { ok: false, reason: 'not-active' };
-    var id = 'c' + game.state.tick + '-' + (game.commands.length + 1);
+    var id = 'c' + game.state.tick + '-' + (++game.cmdSeq); // monotonic: survives undo filtering
     if (game.cmdIds[id]) return { ok: false, reason: 'duplicate' };
     var res = R.applyCommand(game.state, cmd);
     if (!res.ok) {
@@ -235,6 +235,7 @@ import * as BBRender from './render.js';
     game.cmdIds[id] = true;
     game.commands.push({ tick: game.state.tick, id: id, cmd: { type: cmd.type, table: cmd.table, item: cmd.item, x: cmd.x, y: cmd.y } });
     if (cmd.type === 'buy' || cmd.type === 'resign') A.play('buy');
+    else A.play('cmd'); // one-input confidence: every committed action gets an ack
     if (game.mode === 'practice' || game.mode === 'learn') pushUndo();
     checkLessonEvent(cmd);
     updateHud();
@@ -266,7 +267,11 @@ import * as BBRender from './render.js';
     }
     var json = game.undoStack.pop();
     game.state = R.deserialize(json);
+    game.prev = null; // positions jumped: no interpolation from the old timeline
     game.commands = game.commands.filter(function (c) { return c.tick <= game.state.tick; });
+    // The restored state's cfg is a fresh object, so the renderer's identity
+    // check would reject every sync — rebuild the scene from the snapshot.
+    if (view) view.build(game.state, C.THEMES[settings.theme] || C.THEMES.ember, game.cfg.seed, settings);
     A.play('undo');
     showToast('Rewound one second.');
     updateHud();
@@ -290,7 +295,9 @@ import * as BBRender from './render.js';
     var step = game.lesson.steps[lessonIndex()];
     if (!step) return;
     if (step.event === 'buy' && cmd.type === 'buy' && cmd.item === step.item) advanceLesson();
-    else if (step.event === 'serve' && cmd.type === 'serve' && (step.table == null || cmd.table === step.table)) {
+    // Any successful serve advances a serve step: enforcing a strict table order
+    // soft-locks the lesson if the player serves the patient guest first.
+    else if (step.event === 'serve' && cmd.type === 'serve') {
       game.lesson._pendingServe = true; // confirm on event
     } else if (step.event === 'pickup' && cmd.type === 'pickup') game.lesson._pendingPickup = true;
   }
@@ -357,31 +364,34 @@ import * as BBRender from './render.js';
   }
 
   // ---------- HUD ----------
+  var hudBtns = {}; // stable refs for the keyboard shortcuts (button order varies by mode)
   function buildHudActions() {
     hudActions.innerHTML = '';
+    hudBtns = {};
     function add(label, key, fn, aria) {
       var b = el('button', 'btn', label);
       b.type = 'button';
       if (aria) b.setAttribute('aria-label', aria);
       b.addEventListener('click', fn);
       hudActions.appendChild(b);
+      hudBtns[key] = b;
       return b;
     }
-    add('🍽 Pick up', 'k', function () { dispatch({ type: 'pickup' }); }, 'Pick up dishes from the kitchen');
-    add('💡 Hint', 'h', function () {
+    add('🍽 Pick up', 'pickup', function () { dispatch({ type: 'pickup' }); }, 'Pick up dishes from the kitchen');
+    add('💡 Hint', 'hint', function () {
       if (!game) return;
       var h = R.hint(game.state);
       showToast(h.text);
       A.play('hint');
       if (view && h.action && h.action.type === 'serve') view.setHighlights(['table:' + h.action.table]);
     }, 'Show a hint');
-    if (game.cfg.mechanics.undo) add('⏪ Rewind', 'u', undo, 'Rewind one second');
-    add('⏩ Speed', 'f', function () {
+    if (game.cfg.mechanics.undo) add('⏪ Rewind', 'undo', undo, 'Rewind one second');
+    add('⏩ Speed', 'speed', function () {
       if (!game) return;
       game.speed = game.speed === 1 ? 2 : 1;
       showToast('Speed ' + game.speed + '× — the end state is identical.');
     }, 'Toggle fast-forward');
-    add('⏸ Pause', 'p', function () { pauseGame(true); }, 'Pause');
+    add('⏸ Pause', 'pause', function () { pauseGame(true); }, 'Pause');
   }
 
   function updateHud() {
@@ -533,6 +543,12 @@ import * as BBRender from './render.js';
     row.appendChild(b);
     sheet.appendChild(row);
   }
+  // Settings/help reached from the pause menu must return to the pause menu,
+  // not to the title screen (which would strand the paused round behind it).
+  function backToContext(sheet) {
+    if (game && !game.over) backRow(sheet, '← Back', function () { pauseGame(true); });
+    else backRow(sheet);
+  }
 
   var screens = {
     title: function (sheet) {
@@ -655,7 +671,7 @@ import * as BBRender from './render.js';
           funnel('settings-change', { key: key });
         }
       });
-      backRow(sheet);
+      backToContext(sheet);
     },
 
     help: function (sheet) {
@@ -663,7 +679,7 @@ import * as BBRender from './render.js';
       var box = el('div');
       sheet.appendChild(box);
       U.buildHelp(box);
-      backRow(sheet);
+      backToContext(sheet);
     },
 
     profile: function (sheet) {
@@ -712,6 +728,9 @@ import * as BBRender from './render.js';
     document.body.classList.toggle('reduced-motion', !!settings.reducedMotion);
     document.body.classList.toggle('high-contrast', !!settings.highContrast);
     document.body.classList.toggle('large-text', !!settings.largeText);
+    document.body.classList.toggle('left-handed', !!settings.leftHanded);
+    document.body.classList.toggle('board-mirror', !!settings.boardMirror);
+    document.body.classList.toggle('high-visibility', settings.colorPalette === 'high-visibility');
     A.applySettings(settings);
     A.setCaptions(!!settings.captions);
     if (view) view.setQuality(qualityTier(), settings);
@@ -839,7 +858,14 @@ import * as BBRender from './render.js';
     if (e.target && /^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName)) return;
     var k = e.key.toLowerCase();
     if (k === 'escape' || k === 'p') {
-      if (screenEl) { closeScreen(); if (game && !game.over) { game.paused = false; game.lastFrame = performance.now(); } }
+      if (screenEl) {
+        // Only an active in-round overlay (pause and friends) closes to play;
+        // on menu/results screens there is nothing underneath to return to.
+        if (game && !game.over) {
+          closeScreen();
+          game.paused = false; game.lastFrame = performance.now(); A.resume();
+        }
+      }
       else if (game && !game.over) pauseGame(true);
       e.preventDefault();
       return;
@@ -850,9 +876,9 @@ import * as BBRender from './render.js';
       if (tid < game.state.tables.length) dispatch({ type: 'serve', table: tid });
       e.preventDefault();
     } else if (k === 'k') { dispatch({ type: 'pickup' }); e.preventDefault(); }
-    else if (k === 'h') { var b = hudActions.children[1]; if (b) b.click(); e.preventDefault(); }
+    else if (k === 'h') { if (hudBtns.hint) hudBtns.hint.click(); e.preventDefault(); }
     else if (k === 'u') { undo(); e.preventDefault(); }
-    else if (k === 'f') { var bf = hudActions.children[3]; if (bf) bf.click(); e.preventDefault(); }
+    else if (k === 'f') { if (hudBtns.speed) hudBtns.speed.click(); e.preventDefault(); }
     else if (k === 'c') { if (view) view.frameCamera(); e.preventDefault(); }
   });
 
@@ -897,7 +923,8 @@ import * as BBRender from './render.js';
       if (game && !game.over && !game.paused) pauseGame(true);
       A.suspend();
     } else {
-      A.resume();
+      if (!game || game.paused) { /* stay muted while the pause menu is up */ }
+      else A.resume();
       if (game && !game.over) showToast('Service paused while you were away — nothing was lost.');
     }
   });
@@ -910,5 +937,5 @@ import * as BBRender from './render.js';
   syncServerTime();
   showScreen('title');
   rafId = requestAnimationFrame(loop);
-  funnel('round-start', { mode: 'boot' });
+  funnel('app-start');
 })();

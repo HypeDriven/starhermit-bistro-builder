@@ -1,0 +1,12 @@
+{
+  "name": "bistro-builder",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "test": "node tests/run-tests.js",
+    "test:e2e": "node tests/e2e.mjs"
+  },
+  "devDependencies": {
+    "playwright-core": "^1.62.1"
+  }
+}

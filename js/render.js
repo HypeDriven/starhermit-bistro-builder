@@ -215,7 +215,15 @@ function api(container, callbacks) {
         bar.position.y = 0.2; bar.rotation.y = 0.6;
         v.add(bar);
         v.userData.barrier = bar;
-        v.traverse(o => { if (o.material && o !== bar) o.material = o.material.clone(), o.material.opacity = 0.35, o.material.transparent = true; });
+        v.traverse(o => {
+          if (o.material && o !== bar) {
+            var old = o.material;
+            o.material = old.clone();
+            old.dispose(); // each table owns its materials; don't leak the originals
+            o.material.opacity = 0.35;
+            o.material.transparent = true;
+          }
+        });
       }
       v.traverse(o => { if (o.isMesh) o.castShadow = true; });
       v.userData.tableId = t.id;

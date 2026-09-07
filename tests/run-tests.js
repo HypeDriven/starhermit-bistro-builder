@@ -5,6 +5,9 @@
  */
 'use strict';
 
+// Keep the server's score-store writes out of the repo fixture during tests.
+process.env.BISTRO_DATA_DIR = require('path').join(require('os').tmpdir(), 'bistro-test-data-' + process.pid);
+
 const assert = require('assert');
 const R = require('../js/rules.js');
 const C = require('../js/content.js');

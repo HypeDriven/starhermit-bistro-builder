@@ -236,6 +236,7 @@ Success targets for the first public test: median first-play time under 20 secon
 - Property-test deterministic replay: the same version, seed, and commands produce identical state hashes.
 - Fuzz malformed commands and generated content; prove no hangs, NaN physics, impossible mandatory states, or unbounded loops.
 - Golden-test representative easy, medium, hard, interrupted, resumed, and terminal sessions.
+- The canonical automated UI playthrough is `tests/e2e.mjs` (`npm run test:e2e`): real-browser drive of title → lesson → journey stage 1 → results → pause/resume/resign on desktop and mobile viewports. Offline rules/content/replay tests live in `tests/run-tests.js` (`npm test`).
 
 ### Interface and accessibility
 

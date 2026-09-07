@@ -155,6 +155,7 @@
     row('Music', range('music', 0, 1, 0.05));
     row('Effects', range('effects', 0, 1, 0.05));
     row('Ambience', range('ambience', 0, 1, 0.05));
+    row('Voice', range('voice', 0, 1, 0.05));
     row('Mute all', check('muted'));
     row('Captions for sound cues', check('captions'));
     form.appendChild(el('h3', null, 'Graphics'));
@@ -267,7 +268,20 @@
     return { label: 'Free', cls: 'free' };
   }
 
+  // Panels rebuild from state every tick; without this a keyboard user loses
+  // focus mid-Tab before they can activate a station or upgrade button.
+  function rebuildKeepingFocus(container, rebuild) {
+    var active = document.activeElement;
+    var key = active && container.contains(active) ? active.getAttribute('data-fkey') : null;
+    rebuild();
+    if (key) {
+      var next = container.querySelector('[data-fkey="' + key + '"]');
+      if (next) next.focus();
+    }
+  }
+
   function updateStationsMirror(container, state, opts) {
+    rebuildKeepingFocus(container, function () {
     container.innerHTML = '';
     var p = state.waiters[0];
 
@@ -289,6 +303,7 @@
         var b = el('button', 'btn small', 'Serve');
         b.type = 'button';
         b.setAttribute('aria-label', 'Serve table ' + (t.id + 1));
+        b.setAttribute('data-fkey', 'serve-' + t.id);
         b.addEventListener('click', function () { opts.onAction({ type: 'serve', table: t.id }); });
         li.appendChild(b);
       }
@@ -298,11 +313,13 @@
     kitchen.appendChild(el('span', 'station-label', 'Kitchen — ' + state.stock + ' dish(es) ready'));
     var pk = el('button', 'btn small', 'Pick up');
     pk.type = 'button';
+    pk.setAttribute('data-fkey', 'pickup');
     pk.disabled = !(state.stock > 0 && p.carrying < p.capacity);
     pk.addEventListener('click', function () { opts.onAction({ type: 'pickup' }); });
     kitchen.appendChild(pk);
     list.appendChild(kitchen);
     container.appendChild(list);
+    });
   }
 
   // ---------- upgrade panel ----------
@@ -310,12 +327,14 @@
     capacity: 'Bigger tray', helper: 'Hire helper', stove: 'Extra stove', expand: 'Expand floor'
   };
   function updateUpgradePanel(container, state, buyInfoFn, opts) {
+    rebuildKeepingFocus(container, function () {
     container.innerHTML = '';
     ['capacity', 'helper', 'stove', 'expand'].forEach(function (item) {
       if (!state.cfg.mechanics[item]) return;
       var info = buyInfoFn(state, item);
       var b = el('button', 'btn upgrade');
       b.type = 'button';
+      b.setAttribute('data-fkey', 'buy-' + item);
       var label = BUY_LABELS[item];
       if (info.ok) {
         b.appendChild(document.createTextNode(label + ' '));
@@ -328,6 +347,7 @@
           info.reason === 'cap-reached' ? 'max' : (info.cost != null ? info.cost + 'c' : '—')));
       }
       container.appendChild(b);
+    });
     });
   }
 

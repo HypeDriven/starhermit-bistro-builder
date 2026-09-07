@@ -33,6 +33,14 @@ body.high-contrast {
   --bg: #000; --panel: #101010; --panel-2: #1c1c1c;
   --ink: #fff; --ink-dim: #e0e0e0; --accent: #ffd27a; --focus: #00e0ff;
 }
+/* color-vision-safe palette: blue/orange separation instead of red/green */
+body.high-visibility {
+  --accent: #ffb340; --danger: #ff6f61; --ok: #4dd0e1; --focus: #00e0ff;
+}
+/* left-handed layout: swap the rails so the action panel sits under the left hand */
+body.left-handed .rail.left { order: 3; border-right: none; border-left: 1px solid #00000066; }
+body.left-handed .playfield { order: 2; }
+body.left-handed .rail.right { order: 1; border-left: none; border-right: 1px solid #00000066; }
 button, select, input { font: inherit; color: inherit; }
 :focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; border-radius: 4px; }
 
@@ -221,6 +229,15 @@ button, select, input { font: inherit; color: inherit; }
   .rail.open { transform: none; visibility: visible; }
   .drawer-btn { display: inline-flex; }
   body.reduced-motion .rail { transition: none; }
+  /* left-handed: drawers slide in from the opposite edges */
+  body.left-handed .rail.left { left: auto; right: 0; transform: translateX(102%); }
+  body.left-handed .rail.right { right: auto; left: 0; transform: translateX(-102%); }
+  body.left-handed .rail.open { transform: none; }
+  /* board-mirror setting: station panel stays docked instead of a drawer */
+  body.board-mirror .rail.right {
+    position: static; visibility: visible; transform: none;
+    box-shadow: none; width: 260px; flex: 0 0 auto;
+  }
 }
 
 /* ---------- portrait mobile: bottom thumb tray ---------- */
