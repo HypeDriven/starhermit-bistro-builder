@@ -1,0 +1,26 @@
+# Bistro Builder — SFX manifest (canonical). One clip per line:
+# file | event id (BBAudio.play name; SAMPLES map in js/audio.js) | description of the sound | usage context
+# Clips: MOSS-SoundEffect v2.0, 48 kHz mono Opus 96 kbps VBR, loudness-normalised (-20 LUFS), 100 steps.
+# One-shots play on the effects bus; bistro-ambience loops on the ambience bus. Every event id also has a
+# procedural WebAudio fallback in js/audio.js that plays while the clip loads or if fetch/decode fails, and
+# every cue has a caption string (CAPTIONS) plus a DOM/live-region twin, so nothing is audio-only.
+ui-tap.opus | ui | Short soft wooden button tap, a gentle dry click for interface confirmation | Countdown ticks "3, 2, 1" in countdownThen (main.js)
+order-noted.opus | cmd | Quick pencil scribble tick on a paper notepad ending with a small paper rustle | Every accepted serve / pickup / goto command in dispatch (main.js)
+guest-arrive.opus | spawn | Small brass bell above a cafe door jingling as the wooden door swings open | Rules event 'spawn': a guest joins the queue at the door (rules.js step, phase 2)
+chair-scrape.opus | seat | Brief wooden chair scrape on floorboards followed by a soft sit-down thump | Rules event 'seat': a queued guest finishes walking and sits at a table (step, phase 4)
+dish-ready-bell.opus | dish-ready | Bright metallic kitchen service bell ding struck once on a pass counter | Rules event 'dish-ready' (a stove finishes a dish, step phase 1); also lesson-step advance in advanceLesson (main.js)
+tray-pickup.opus | pickup | Ceramic plates lifted onto a wooden serving tray with a light clatter | Rules event 'pickup': a waiter loads dishes from the kitchen stock (resolveTask)
+plate-serve.opus | serve | A ceramic plate set down gently on a wooden bistro table with a soft clink of cutlery | Rules event 'serve': a dish reaches a waiting guest and coins are paid (resolveTask)
+door-slam.opus | leave-angry | A wooden cafe door slammed shut, glass pane rattling in the frame | Rules event 'leave-angry': a guest's patience hits zero and they walk out (step phase 4, -10 score)
+guest-thanks.opus | leave-happy | Cheerful coin purse jingle with a contented satisfied hum as a guest departs | Rules event 'leave-happy': a served guest finishes eating and frees the table
+cash-register.opus | buy | Vintage mechanical cash register cha-ching with bell ring and drawer slide | dispatch (main.js): buy capacity or stove, and resign; rules event 'buy'
+error-buzz.opus | invalid | Short dull muted buzzer thud, a soft wrong-answer buzz | dispatch (main.js): any rejected command, paired with the red invalid toast
+day-complete-fanfare.opus | win | Small celebratory brass fanfare with clinking glasses and a cheerful crowd murmur swell | onTerminal (main.js) when terminal.win is true: goal-reached or day-complete
+day-missed.opus | lose | Soft descending disappointed horn phrase, low and deflating like a sad trombone | onTerminal (main.js) when terminal.win is false: day-failed or resigned
+rewind-swoosh.opus | undo | Quick airy whoosh of paper pages flipping rapidly backward | undo (main.js): a practice/learn snapshot is restored (U key or Rewind button)
+hint-sparkle.opus | hint | Gentle magical sparkle glissando of tiny bells twinkling upward | Hint button / H key (main.js): R.hint text shown as a toast, suggested table highlighted
+service-open-bell.opus | service-start | A small brass hand bell rung twice briskly, bright and cheerful, in a warm wooden cafe room | countdownThen (main.js): the "Service begins!" banner that ends the 3-2-1 countdown
+wall-knock.opus | expand | A wooden mallet striking a plaster and lath wall that breaks through, boards cracking and light rubble tumbling onto floorboards | dispatch (main.js): buy 'expand' accepted; walled-off tables open (replaces the generic buy cue)
+patience-tick.opus | urgent | Two quick hollow wood-block knocks, a soft urgent warning tap, close-miked and dry | checkUrgent (main.js): first time a seated guest drops under 30% patience (the ring turns red); once per guest
+helper-hired.opus | hire | A cotton apron snapped taut and tied with a cloth rustle, followed by two quick friendly hand claps | dispatch (main.js): buy 'helper' accepted; a helper waiter spawns at the bottom wall (replaces the generic buy cue)
+bistro-ambience.opus | ambience | Soft continuous cafe room tone: distant muffled chatter of a few diners, occasional cutlery clink on ceramic plates, a faint kitchen hiss, warm and cozy, no music | startAmbience (audio.js): 10 s seamless loop on the ambience bus for the whole round; the synthesized brown-noise bed fades out once the clip decodes

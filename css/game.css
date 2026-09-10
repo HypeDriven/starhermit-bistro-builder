@@ -149,6 +149,18 @@ button, select, input { font: inherit; color: inherit; }
 .title-hero { text-align: center; padding: 1em 0 1.5em; }
 .title-hero .logo { font-size: clamp(2em, 7vw, 3.4em); margin: 0; color: var(--accent); letter-spacing: .03em; }
 .title-hero p { color: var(--ink-dim); max-width: 46ch; margin: .5em auto; }
+/* key art (assets/key-art.webp): 16:9 diorama above the logo; removed on load error */
+.title-hero .key-art {
+  display: block; width: 100%; max-width: 560px; aspect-ratio: 1200 / 672;
+  margin: 0 auto .6em; border-radius: var(--radius); object-fit: cover;
+  box-shadow: 0 8px 28px #000a; border: 1px solid #00000066;
+}
+/* results illustration (assets/results-win|lose.webp) */
+.result-art {
+  display: block; width: 100%; max-width: 360px; aspect-ratio: 640 / 400;
+  margin: .2em 0 .4em; border-radius: var(--radius); object-fit: cover; border: 1px solid #00000066;
+}
+@media (max-height: 560px) { .title-hero .key-art { max-width: 300px; } .result-art { max-width: 200px; } }
 .level-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(76px, 1fr)); gap: .5em; margin: .8em 0; }
 .level-cell {
   aspect-ratio: 1; border-radius: var(--radius); border: 1px solid #00000055;

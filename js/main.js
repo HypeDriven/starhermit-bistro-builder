@@ -211,7 +211,7 @@ import * as BBRender from './render.js';
       if (!game) return;
       if (i < seq.length) {
         showBanner(seq[i], i === seq.length - 1 ? 900 : 620);
-        A.play('ui');
+        A.play(i === seq.length - 1 ? 'service-start' : 'ui'); // hand bell opens service
         i++;
         setTimeout(next, settings.reducedMotion ? 200 : 640);
       } else {
@@ -234,7 +234,9 @@ import * as BBRender from './render.js';
     }
     game.cmdIds[id] = true;
     game.commands.push({ tick: game.state.tick, id: id, cmd: { type: cmd.type, table: cmd.table, item: cmd.item, x: cmd.x, y: cmd.y } });
-    if (cmd.type === 'buy' || cmd.type === 'resign') A.play('buy');
+    if (cmd.type === 'buy' && cmd.item === 'expand') A.play('expand');   // wall comes down
+    else if (cmd.type === 'buy' && cmd.item === 'helper') A.play('hire'); // apron on
+    else if (cmd.type === 'buy' || cmd.type === 'resign') A.play('buy');
     else A.play('cmd'); // one-input confidence: every committed action gets an ack
     if (game.mode === 'practice' || game.mode === 'learn') pushUndo();
     checkLessonEvent(cmd);
@@ -332,7 +334,7 @@ import * as BBRender from './render.js';
           game.hashes.push({ tick: game.state.tick, hash: R.hashState(game.state) });
         if (game.state.terminal) { onTerminal(); break; }
       }
-      if (steps) updateHud();
+      if (steps) { updateHud(); checkUrgent(); }
     }
     if (view) {
       var alpha = game.paused || game.over ? 1 : Math.min(1, game.acc / R.TICK_MS);
@@ -340,6 +342,23 @@ import * as BBRender from './render.js';
       view.renderFrame(dt / 1000);
     }
     pollGamepad();
+  }
+
+  // One warning cue per guest the first time their patience drops under 30%
+  // (the same threshold legalActions marks as urgent). Presentation only.
+  function checkUrgent() {
+    if (!game || game.over) return;
+    if (!game.urgentSeen) game.urgentSeen = {};
+    var gs = game.state.guests;
+    for (var i = 0; i < gs.length; i++) {
+      var g = gs[i];
+      if (g.status !== 'seated' || game.urgentSeen[g.id]) continue;
+      if (g.patience <= g.maxPatience * 0.3) {
+        game.urgentSeen[g.id] = true;
+        A.play('urgent');
+        announce('Table ' + (g.tableId + 1) + ' is about to walk out.');
+      }
+    }
   }
 
   function cloneLite(state) { // positions only, for interpolation
@@ -553,6 +572,10 @@ import * as BBRender from './render.js';
   var screens = {
     title: function (sheet) {
       var hero = el('div', 'title-hero');
+      var art = el('img', 'key-art');
+      art.src = 'assets/key-art.webp'; art.alt = ''; art.decoding = 'async';
+      art.addEventListener('error', function () { art.remove(); }); // missing art never breaks the title
+      hero.appendChild(art);
       hero.appendChild(el('h2', 'logo', 'Bistro Builder'));
       hero.appendChild(el('p', null, 'Seat the crowd, carry the dishes, grow the room. One bustling miniature bistro, one service at a time.'));
       sheet.appendChild(hero);
@@ -771,6 +794,10 @@ import * as BBRender from './render.js';
         mode === 'learn' ? 'Lesson complete!' :
         win ? (t.reason === 'goal-reached' ? 'Goal reached!' : 'Day complete!') : 'Service over — goal missed.');
       sheet.appendChild(head);
+      var art = el('img', 'result-art');
+      art.src = win ? 'assets/results-win.webp' : 'assets/results-lose.webp'; art.alt = ''; art.decoding = 'async';
+      art.addEventListener('error', function () { art.remove(); });
+      sheet.appendChild(art);
       sheet.appendChild(el('p', 'mini',
         cfg.name + ' · seed ' + (cfg.seed >>> 0).toString(36) + ' · content v' + envelope.contentVersion + ' · build ' + envelope.build));
 

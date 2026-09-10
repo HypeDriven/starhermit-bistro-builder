@@ -19,3 +19,8 @@ Generated with MOSS-SoundEffect v2.0, 48 kHz mono Opus (96 kbps VBR, loudness-no
 | day-missed.opus | lose | Soft descending disappointed horn phrase, low and deflating like a sad trombone. |
 | rewind-swoosh.opus | undo | Quick airy whoosh of paper pages flipping rapidly backward. |
 | hint-sparkle.opus | hint | Gentle magical sparkle glissando of tiny bells twinkling upward. |
+| service-open-bell.opus | service-start | A small brass hand bell rung twice briskly, bright and cheerful, in a warm wooden cafe room. |
+| wall-knock.opus | expand | A wooden mallet striking a plaster and lath wall that breaks through, boards cracking and light rubble tumbling onto floorboards. |
+| patience-tick.opus | urgent | Two quick hollow wood-block knocks, a soft urgent warning tap, close-miked and dry. |
+| helper-hired.opus | hire | A cotton apron snapped taut and tied with a cloth rustle, followed by two quick friendly hand claps. |
+| bistro-ambience.opus | ambience | Soft continuous cafe room tone: distant muffled chatter of a few diners, occasional cutlery clink on ceramic plates, a faint kitchen hiss in the background, warm and cozy, no music. |

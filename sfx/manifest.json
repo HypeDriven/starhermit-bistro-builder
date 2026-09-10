@@ -88,5 +88,35 @@
     "seconds": 1,
     "prompt": "Gentle magical sparkle glissando of tiny bells twinkling upward.",
     "event": "hint"
+  },
+  {
+    "name": "service-open-bell",
+    "seconds": 2,
+    "prompt": "A small brass hand bell rung twice briskly, bright and cheerful, in a warm wooden cafe room.",
+    "event": "service-start"
+  },
+  {
+    "name": "wall-knock",
+    "seconds": 2,
+    "prompt": "A wooden mallet striking a plaster and lath wall that breaks through, boards cracking and light rubble tumbling onto floorboards.",
+    "event": "expand"
+  },
+  {
+    "name": "patience-tick",
+    "seconds": 1,
+    "prompt": "Two quick hollow wood-block knocks, a soft urgent warning tap, close-miked and dry.",
+    "event": "urgent"
+  },
+  {
+    "name": "helper-hired",
+    "seconds": 2,
+    "prompt": "A cotton apron snapped taut and tied with a cloth rustle, followed by two quick friendly hand claps.",
+    "event": "hire"
+  },
+  {
+    "name": "bistro-ambience",
+    "seconds": 10,
+    "prompt": "Soft continuous cafe room tone: distant muffled chatter of a few diners, occasional cutlery clink on ceramic plates, a faint kitchen hiss in the background, warm and cozy, no music.",
+    "event": "ambience"
   }
 ]

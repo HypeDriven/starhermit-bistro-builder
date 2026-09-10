@@ -84,7 +84,9 @@
     'pickup': 'dishes picked up', 'serve': 'guest served',
     'leave-angry': 'guest left angry', 'buy': 'upgrade bought',
     'invalid': 'not allowed', 'win': 'day complete', 'lose': 'goal missed',
-    'undo': 'rewind', 'hint': 'hint'
+    'undo': 'rewind', 'hint': 'hint',
+    'service-start': 'service begins', 'expand': 'wall knocked down',
+    'urgent': 'guest losing patience', 'hire': 'helper hired'
   };
   var SFX = {
     'ui':         function () { blip(620, 0.06, 'triangle', 0.12); },
@@ -114,7 +116,20 @@
     },
     'lose':       function () { blip(320, 0.5, 'sine', 0.15, 'effects', ctx.currentTime, 200); blip(210, 0.6, 'sine', 0.1, 'effects', ctx.currentTime + 0.16, 130); },
     'undo':       function () { blip(500, 0.08, 'triangle', 0.1, 'effects', ctx.currentTime, 380); },
-    'hint':       function () { blip(990, 0.12, 'sine', 0.1); blip(1320, 0.14, 'sine', 0.07, 'effects', ctx.currentTime + 0.07); }
+    'hint':       function () { blip(990, 0.12, 'sine', 0.1); blip(1320, 0.14, 'sine', 0.07, 'effects', ctx.currentTime + 0.07); },
+    // hand bell rung twice: countdown ends, service opens
+    'service-start': function () {
+      [0, 0.22].forEach(function (d) {
+        blip(1568, 0.3, 'triangle', 0.12, 'effects', ctx.currentTime + d);
+        blip(2349, 0.22, 'sine', 0.06, 'effects', ctx.currentTime + d + 0.01);
+      });
+    },
+    // mallet through a wall: low thud + falling rubble clatter
+    'expand':     function () { noise(0.12, 0.35, 900); noise(0.3, 0.18, 2400, ctx.currentTime + 0.1); blip(90, 0.2, 'sine', 0.16, 'effects', ctx.currentTime, 50); },
+    // two hollow wood-block knocks: a guest is about to walk out
+    'urgent':     function () { blip(1100, 0.05, 'square', 0.06); blip(1100, 0.05, 'square', 0.06, 'effects', ctx.currentTime + 0.11); },
+    // apron snap + two claps: helper hired
+    'hire':       function () { noise(0.05, 0.25, 3000); noise(0.04, 0.22, 3600, ctx.currentTime + 0.18); noise(0.04, 0.22, 3600, ctx.currentTime + 0.3); }
   };
 
   // ---------- authored samples: lazy fetch/decode/cache, synth is fallback ----------
@@ -123,11 +138,14 @@
     'seat': 'chair-scrape', 'dish-ready': 'dish-ready-bell', 'pickup': 'tray-pickup',
     'serve': 'plate-serve', 'leave-angry': 'door-slam', 'leave-happy': 'guest-thanks',
     'buy': 'cash-register', 'invalid': 'error-buzz', 'win': 'day-complete-fanfare',
-    'lose': 'day-missed', 'undo': 'rewind-swoosh', 'hint': 'hint-sparkle'
+    'lose': 'day-missed', 'undo': 'rewind-swoosh', 'hint': 'hint-sparkle',
+    'service-start': 'service-open-bell', 'expand': 'wall-knock',
+    'urgent': 'patience-tick', 'hire': 'helper-hired'
   };
+  var AMBIENCE_SAMPLE = 'bistro-ambience'; // 10 s room-tone loop on the ambience bus
   var sampleCache = {}; // basename -> 'loading' | AudioBuffer | null (failed)
 
-  function loadSample(name) {
+  function loadSample(name, onLoaded) {
     if (sampleCache[name] !== undefined) return; // one fetch per clip, no duplicates
     sampleCache[name] = 'loading';
     fetch('sfx/' + name + '.opus')
@@ -136,7 +154,7 @@
         return res.arrayBuffer();
       })
       .then(function (buf) { return ctx.decodeAudioData(buf); })
-      .then(function (audio) { sampleCache[name] = audio; })
+      .then(function (audio) { sampleCache[name] = audio; if (onLoaded) onLoaded(audio); })
       .catch(function () { sampleCache[name] = null; }); // permanent synth fallback
   }
 
@@ -180,6 +198,19 @@
     src.connect(f); f.connect(g); g.connect(buses.ambience);
     src.start();
     ambienceNodes = { src: src, gain: g };
+    // Authored room tone replaces the synthesized bed once it has decoded;
+    // the synth keeps playing if the clip is missing or fails to decode.
+    loadSample(AMBIENCE_SAMPLE, function (audio) {
+      if (!ctx || !ambienceNodes || ambienceNodes.authored) return;
+      var loop = ctx.createBufferSource();
+      loop.buffer = audio; loop.loop = true;
+      loop.loopStart = 0.05; loop.loopEnd = Math.max(0.5, audio.duration - 0.08); // skip the encoded fades
+      var lg = ctx.createGain(); lg.gain.value = 0.9;
+      loop.connect(lg); lg.connect(buses.ambience);
+      loop.start(0, 0.05);
+      g.gain.setTargetAtTime(0, ctx.currentTime, 0.4);
+      ambienceNodes.authored = loop;
+    });
     var clink = function () {
       if (!ctx || settings.muted) return;
       var t = ctx.currentTime;

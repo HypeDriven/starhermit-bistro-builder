@@ -31,7 +31,7 @@ const MIME = {
   '.css': 'text/css; charset=utf-8', '.json': 'application/json',
   '.png': 'image/png', '.svg': 'image/svg+xml', '.txt': 'text/plain; charset=utf-8',
   '.ico': 'image/x-icon', '.webmanifest': 'application/manifest+json',
-  '.opus': 'audio/ogg'
+  '.opus': 'audio/ogg', '.webp': 'image/webp'
 };
 
 // ---------- durable store ----------
