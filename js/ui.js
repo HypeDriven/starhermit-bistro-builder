@@ -224,7 +224,10 @@
   }
 
   // ---------- leaderboard ----------
-  function buildLeaderboard(container, entries, rivals, title) {
+  // resolveName(userId) -> Promise<string> upgrades server rows carrying a
+  // playerId to display names (profile nicknames); rows without one keep
+  // their stored name ('You' locally).
+  function buildLeaderboard(container, entries, rivals, title, resolveName) {
     container.innerHTML = '';
     if (title) container.appendChild(el('h3', null, title));
     var table = el('table', 'lb-table');
@@ -232,7 +235,7 @@
     ['#', 'Name', 'Score', 'When'].forEach(function (h) { head.appendChild(el('th', null, h)); });
     table.appendChild(head);
     var rows = entries.map(function (e) {
-      return { name: e.name || 'You', score: e.score, you: !!e.you, date: e.date || '' };
+      return { name: e.name || 'You', playerId: e.playerId, score: e.score, you: !!e.you, date: e.date || '' };
     }).concat((rivals || []).map(function (r) {
       return { name: r.name + ' (regular)', score: r.score, you: false, date: '' };
     }));
@@ -240,7 +243,10 @@
     rows.slice(0, 12).forEach(function (r, i) {
       var tr = el('tr', r.you ? 'you' : '');
       tr.appendChild(el('td', null, String(i + 1)));
-      tr.appendChild(el('td', null, r.name));
+      var nameTd = el('td', null, r.name);
+      if (resolveName && r.playerId)
+        resolveName(r.playerId).then(function (n) { nameTd.textContent = n; });
+      tr.appendChild(nameTd);
       tr.appendChild(el('td', null, String(r.score)));
       tr.appendChild(el('td', null, r.date));
       table.appendChild(tr);

@@ -187,6 +187,7 @@ const server = http.createServer((req, res) => {
           invalid: env.invalid | 0, durationMs: env.durationMs | 0,
           sessionId: String(env.sessionId || '').slice(0, 40),
           name: String(env.name || 'Player').slice(0, 24),
+          playerId: typeof env.playerId === 'string' ? env.playerId.slice(0, 64) : '',
           date: new Date().toISOString().slice(0, 10),
           ruleset: env.contentVersion, seed: env.seed >>> 0,
           win: !!env.terminal.win

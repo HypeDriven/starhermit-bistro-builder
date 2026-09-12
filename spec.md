@@ -248,9 +248,9 @@ Conventions per https://wiki.starhermit.com/ — packaging via `starhermit.txt` 
 - `starhermit.txt`: `name=Bistro Builder`, `launch=index.html`, `owner=<uuid>`, `server=server.js`, `cover=coverart.png`.
 - `server.js` as the game script: serves the distribution (refusing `server.js`, `spec.md`, anything under `data/`, and paths escaping the root), and exposes `GET /api/v1/time` (daily boundary sync with round-trip offset in `main.js#syncServerTime`), `GET /api/v1/scores?cfgId=`, `POST /api/v1/scores` (full deterministic replay through `rules.js`; rejects stale content version, unknown content, seed mismatch, hash or score mismatch; per-IP rate limit 12/min; idempotent per session+content), and `POST /api/v1/events` (anonymous funnel counters: `app-start`, `round-start`, `round-end`, `tutorial-step`, `settings-change`).
 - Structured `{"error":"…"}` responses everywhere; the client treats any failure as "offline" and falls back to the local board.
-- On static platform hosts (`<uuid>.starhermit.com`) the client skips `/api` entirely and runs offline.
+- **Launch token** (`main.js#initPlatform`): read from the URL fragment `#game_token=<jwt>` (optional `&session_id=`, stripped after the read; query `?token=`/`?launch_token=` kept for local dev), decoded for `sub` + `game_scope` (never hard-coded), sent as `Authorization: Bearer` on every `/api` call, re-minted every 45 min via `POST /api/v1/games/{slug}/launch-token` (60 s retry on failure). The old self-disable on `<uuid>.starhermit.com` hosts is gone — hosted mode activates iff a token was read. Ranked envelopes carry `playerId` (the account id) so board rows attach to the account; `GET /api/v1/users/{id}/profile` (never `/api/v1/me`, never usernames; `Player <id8>` fallback) resolves row nicknames on the leaderboard screen, the own row is highlighted, and everything still degrades to local boards when the routes 404.
 
-**Not used:** platform identity/sign-in, profile display names or avatars, presence heartbeats, platform achievements and leaderboard endpoints (achievements and boards are local + `server.js`), cloud saves, launch activity start/end, sessions/rooms, websockets, chat, voice, entitlements.
+**Not used:** avatars, presence heartbeats, platform achievements (achievements are local in the save document), cloud saves, launch activity start/end, sessions/rooms, websockets, chat, voice, entitlements.
 
 ## 13. Technical architecture
 
@@ -294,7 +294,7 @@ Conventions per https://wiki.starhermit.com/ — packaging via `starhermit.txt` 
 ## 16. Known limitations
 
 - Localization: English only (§10).
-- Platform identity, presence, cloud save and platform-side achievements/leaderboards are not called; boards are local plus the game's own `server.js`, and "house regulars" are seeded rivals, not real players.
+- Presence, cloud save and platform-side achievements/leaderboards are not called; boards are the game's own `server.js` plus a local fallback, and "house regulars" are seeded rivals, not real players.
 - The "Rewind" toast says "one second" but the snapshot cadence is one per accepted command; a rewind is "before your last command".
 - Queued guests who have no table drain patience while standing at the door, so an over-full queue can lose guests you never had a chance to serve.
 - Helper waiters share the Frost theme's accent colour (`0x7ec8e8`); under the Frost theme they are less distinct from the door glow.
@@ -306,7 +306,7 @@ Conventions per https://wiki.starhermit.com/ — packaging via `starhermit.txt` 
 ## Design intent not yet implemented
 
 - Full string tables and a language selector for en-US, en-GB, es-419, es-ES, de-DE, fr-FR, fr-CA, pt-BR, it-IT.
-- Platform identity, presence heartbeats, cloud-saved progress, and platform achievement/leaderboard submission per the StarHermit wiki, with friends filtering.
+- Presence heartbeats, cloud-saved progress, and platform achievement/leaderboard endpoints per the StarHermit wiki, with friends filtering (launch-token identity and board nickname display are done; boards remain served by the game's own `server.js`).
 - A per-second undo snapshot cadence to match the "Rewound one second" wording, or reword the toast.
 - Item-specific synth/clip cues for tray and stove purchases (currently the generic cash register).
 - Voice-bus content (a short greeter line on service start) and haptic pulses on `urgent` and `serve` on devices that support them.

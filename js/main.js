@@ -23,17 +23,115 @@ import * as BBRender from './render.js';
 
   // ---------- host API (same-origin /api when hosted; offline-safe) ----------
   var serverOffsetMs = null; // round-trip-adjusted server time offset
-  var staticPlatformHost = /^[0-9a-f-]{36}\.starhermit\.com$/i.test(location.hostname);
+
+  // Launch token: fragment #game_token=<jwt> (platform contract), stripped
+  // after the read; query forms kept for local dev. Decoded for sub +
+  // game_scope — the slug is never hard-coded. Memory only, never persisted.
+  var launchToken = null, platformUserId = null, platformSlug = null;
+  var profileNames = {};   // userId -> Promise<string> (cached nicknames)
+  var refreshTimer = null, refreshRetryTimer = null;
+
+  function decodeJwt(t) {
+    try {
+      var seg = String(t).split('.')[1];
+      if (!seg) return null;
+      var b64 = seg.replace(/-/g, '+').replace(/_/g, '/');
+      b64 += '='.repeat((4 - (b64.length % 4)) % 4);
+      var bin = atob(b64);
+      var bytes = new Uint8Array(bin.length);
+      for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      return JSON.parse(new TextDecoder().decode(bytes));
+    } catch (e) { return null; }
+  }
+
+  // Fragment first; query params (?token=/?launch_token=) are local-dev only.
+  function readLaunchToken() {
+    try {
+      var h = new URLSearchParams(String(location.hash || '').replace(/^#/, ''));
+      var t = h.get('game_token');
+      if (t) {
+        h.delete('game_token');
+        h.delete('session_id');
+        var rest = h.toString();
+        history.replaceState(null, '', location.pathname + location.search + (rest ? '#' + rest : ''));
+        return t;
+      }
+      var q = new URLSearchParams(location.search);
+      return q.get('game_token') || q.get('token') || q.get('launch_token') || null;
+    } catch (e) { return null; }
+  }
+
+  function initPlatform() {
+    launchToken = readLaunchToken();
+    if (launchToken) {
+      var claims = decodeJwt(launchToken);
+      if (!claims) launchToken = null; // malformed: standalone
+      else {
+        if (typeof claims.sub === 'string' && claims.sub) platformUserId = claims.sub;
+        if (typeof claims.game_scope === 'string' && claims.game_scope) platformSlug = claims.game_scope;
+        if (!platformUserId || !platformSlug) launchToken = null; // not a usable launch token
+      }
+    }
+    if (launchToken) scheduleTokenRefresh();
+  }
+
+  // The token lives 60 min; scoped tokens may re-mint via the game's
+  // launch-token route. Retry a failed re-mint after ~60 s.
+  function scheduleTokenRefresh() {
+    if (refreshTimer) clearInterval(refreshTimer);
+    refreshTimer = setInterval(refreshLaunchToken, 45 * 60 * 1000);
+  }
+  function refreshLaunchToken() {
+    if (!launchToken || !platformSlug) return Promise.resolve(false);
+    return apiPost('/api/v1/games/' + encodeURIComponent(platformSlug) + '/launch-token', {}).then(function (res) {
+      if (res.ok && res.body && typeof res.body.token === 'string' && res.body.token) {
+        launchToken = res.body.token;
+        var claims = decodeJwt(launchToken);
+        if (claims && claims.sub) platformUserId = claims.sub;
+        if (claims && claims.game_scope) platformSlug = claims.game_scope;
+        return true;
+      }
+      retryTokenRefresh();
+      return false;
+    });
+  }
+  function retryTokenRefresh() {
+    if (refreshRetryTimer || !launchToken) return;
+    refreshRetryTimer = setTimeout(function () {
+      refreshRetryTimer = null;
+      refreshLaunchToken();
+    }, 60000);
+  }
+
+  // Display names for board rows: the profile nickname is the only profile
+  // read a game-scoped token may make (never /api/v1/me, never usernames).
+  // Off-platform the call fails and the neutral "Player <id8>" fallback is
+  // used. Cached per id.
+  function profileFor(userId) {
+    if (!userId || typeof userId !== 'string') return Promise.resolve('player');
+    if (profileNames[userId]) return profileNames[userId];
+    var p = apiGet('/api/v1/users/' + encodeURIComponent(userId) + '/profile').then(function (res) {
+      var n = res.ok && res.body && typeof res.body.nickname === 'string' && res.body.nickname
+        ? res.body.nickname : null;
+      return n || ('Player ' + userId.slice(0, 8));
+    });
+    profileNames[userId] = p;
+    return p;
+  }
+
+  function apiHeaders(extra) {
+    var h = extra || {};
+    if (launchToken) h['Authorization'] = 'Bearer ' + launchToken;
+    return h;
+  }
   function apiGet(path) {
-    if (staticPlatformHost) return Promise.resolve({ ok: false, body: { error: 'offline' } });
-    return fetch(path, { headers: { 'Accept': 'application/json' } })
+    return fetch(path, { headers: apiHeaders({ 'Accept': 'application/json' }) })
       .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); })
       .catch(function () { return { ok: false, body: { error: 'offline' } }; });
   }
   function apiPost(path, payload) {
-    if (staticPlatformHost) return Promise.resolve({ ok: false, body: { error: 'offline' } });
     return fetch(path, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      method: 'POST', headers: apiHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify(payload)
     }).then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); })
       .catch(function () { return { ok: false, body: { error: 'offline' } }; });
@@ -491,6 +589,7 @@ import * as BBRender from './render.js';
       terminal: { reason: t.reason, win: t.win, tick: t.tick, score: t.score },
       sessionId: sessionId, invalid: game.invalidCount, durationMs: t.elapsedMs
     };
+    if (platformUserId) envelope.playerId = platformUserId; // attach board rows to the account
     if (game.cfg.ranked) submitScore(envelope);
 
     funnel('round-end', { mode: game.mode, id: game.cfg.id, win: t.win, score: st.score.total });
@@ -734,8 +833,14 @@ import * as BBRender from './render.js';
       var daily = C.dailyCfg(utcDateStr());
       apiGet('/api/v1/scores?cfgId=' + encodeURIComponent(daily.id)).then(function (res) {
         var local = S.loadBoards().entries.filter(function (e) { return e.cfgId === daily.id; });
-        var entries = (res.ok && Array.isArray(res.body.entries)) ? res.body.entries : local;
-        U.buildLeaderboard(box, entries, C.rivalScores(daily), 'Today — ' + daily.id);
+        var entries = (res.ok && Array.isArray(res.body.entries)) ? res.body.entries.map(function (e) {
+          return {
+            name: e.name, playerId: e.playerId,
+            you: !!(e.playerId && e.playerId === platformUserId),
+            score: e.score, date: e.date
+          };
+        }) : local;
+        U.buildLeaderboard(box, entries, C.rivalScores(daily), 'Today — ' + daily.id, profileFor);
         if (!res.ok) box.appendChild(el('p', 'mini', 'Offline: showing local scores. Hosted boards sync when connected.'));
       });
       backRow(sheet);
@@ -961,6 +1066,7 @@ import * as BBRender from './render.js';
   // ---------- boot ----------
   buildShell();
   applySettings();
+  initPlatform();
   syncServerTime();
   showScreen('title');
   rafId = requestAnimationFrame(loop);
