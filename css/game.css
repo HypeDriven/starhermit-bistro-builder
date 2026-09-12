@@ -264,7 +264,11 @@ button, select, input { font: inherit; color: inherit; }
 @media (max-height: 500px) and (orientation: landscape) {
   .topbar { padding-top: calc(.2em + var(--sat)); padding-bottom: .2em; font-size: .85em; }
   .stat-chip { padding: .1em .6em; }
-  .hud-actions { bottom: calc(.3em + var(--sab)); }
+  /* actions become a right-hand column so the room keeps the full height */
+  .hud-actions {
+    left: auto; right: calc(.4em + var(--sar)); bottom: auto; top: 50%; transform: translateY(-50%);
+    flex-direction: column; flex-wrap: nowrap; width: auto; max-width: 40vw;
+  }
   .hud-actions .btn { min-height: 44px; font-size: .9em; }
   .screen .row { margin-top: .5em; }
 }

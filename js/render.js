@@ -228,9 +228,9 @@ function api(container, callbacks) {
       v.traverse(o => { if (o.isMesh) o.castShadow = true; });
       v.userData.tableId = t.id;
       // pick proxy on the pick layer
-      const pick = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.45, 0.6, 8),
+      const pick = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 1.1, 8),
         new THREE.MeshBasicMaterial({ visible: false }));
-      pick.position.y = 0.3;
+      pick.position.y = 0.55;
       pick.layers.set(LAYER_PICK);
       pick.userData = { kind: 'table', id: t.id };
       v.add(pick);
@@ -285,12 +285,46 @@ function api(container, callbacks) {
     dirty = true;
   }
 
+  // Frames the whole room (plus the door queue and a margin) inside the
+  // current viewport on both axes: the authored elevation/back ratio is kept
+  // and the distance grows until every projected corner is inside the frame.
   function frameCamera() {
     if (!cfg) return;
     const c = gridToWorld((cfg.grid.w - 1) / 2, (cfg.grid.h - 1) / 2);
     const span = Math.max(cfg.grid.w, cfg.grid.h);
     camTarget.set(c.x, 0, c.z);
-    camera.position.set(c.x, CAM_ELEV * (span / 9), c.z + CAM_BACK * (span / 9));
+    const dir = new THREE.Vector3(0, CAM_ELEV, CAM_BACK).normalize();
+    const hw = cfg.grid.w / 2 * TILE + 1.2, hd = cfg.grid.h / 2 * TILE + 1.2;
+    const corners = [];
+    for (const x of [-hw, hw]) for (const z of [-hd, hd]) for (const y of [0, 1.6])
+      corners.push(new THREE.Vector3(c.x + x, y, c.z + z));
+    // Overlaid action tray: carve its edge out of the frame (view offset keeps
+    // the room centred in what remains).
+    const W = container.clientWidth || 1, H = container.clientHeight || 1;
+    let sx = 0, sy = 0, sw = W, sh = H;
+    const tray = container.querySelector('.hud-actions');
+    if (tray && tray.offsetParent !== null) {
+      const cr = container.getBoundingClientRect(), tr = tray.getBoundingClientRect();
+      const t = { l: tr.left - cr.left, t: tr.top - cr.top, r: tr.right - cr.left, b: tr.bottom - cr.top };
+      if (t.t > H * 0.55 && t.t < H) sh = t.t;
+      else if (t.l > W * 0.55 && t.l < W) sw = t.l;
+    }
+    camera.aspect = sw / sh;
+    camera.setViewOffset(sw, sh, -sx, -sy, W, H);
+    camera.updateProjectionMatrix();
+    const margin = 0.9; // NDC extent to keep clear of the HUD edges
+    const v = new THREE.Vector3();
+    let dist = Math.hypot(CAM_ELEV, CAM_BACK) * (span / 9);
+    for (let i = 0; i < 12; i++) {
+      camera.position.copy(camTarget).addScaledVector(dir, dist);
+      camera.lookAt(camTarget);
+      camera.updateMatrixWorld();
+      let worst = 0;
+      for (const p of corners) { v.copy(p).project(camera); worst = Math.max(worst, Math.abs(v.x), Math.abs(v.y)); }
+      if (worst <= margin) break;
+      dist *= Math.min(1.6, worst / margin + 0.02);
+    }
+    camera.position.copy(camTarget).addScaledVector(dir, dist);
     camera.lookAt(camTarget);
   }
 
@@ -452,7 +486,9 @@ function api(container, callbacks) {
     const w = container.clientWidth || 1, h = container.clientHeight || 1;
     renderer.setSize(w, h, false);
     camera.aspect = w / h;
+    camera.clearViewOffset();
     camera.updateProjectionMatrix();
+    frameCamera();
     dirty = true;
   }
 
