@@ -12,21 +12,25 @@
 | Players | 1; asynchronous score comparison on ranked content |
 | Session | 90 s (Solo Sprint) to 5 min (Marathon); a Journey stage is 2–4 min; a Learn lesson under 1 min |
 | Platforms | Desktop and mobile browsers (portrait and landscape); WebGL optional |
-| Rendering | Three.js r-module (`vendor/three.module.min.js`) diorama with fully procedural geometry, plus a semantic HTML "station mirror" that is a complete playable text twin of the board |
+| Rendering | Three.js r160 (`vendor/three.module.min.js` + same-revision addons under `vendor/three/addons/`, mapped by an importmap) diorama with fully procedural geometry, plus a semantic HTML "station mirror" that is a complete playable text twin of the board |
 | Simulation | Fixed 100 ms tick, seeded, deterministic, replay-validated on the server |
 
 ### File map
 
 | Path | Role |
 |---|---|
-| `index.html` | Entry; loads `rng`, `rules`, `content`, `store`, `audio`, `ui` as globals, then `main.js` as a module |
+| `index.html` | Entry; importmap (`three`, `three/addons/`), loads `rng`, `rules`, `content`, `store`, `audio`, `ui` as globals, then `main.js` as a module |
 | `js/rng.js` | mulberry32 PRNG, FNV-1a `hashString`, three derived streams (rules / decor / AV) |
 | `js/rules.js` | Pure rules engine: `createGame`, `legalActions`, `applyCommand`, `step`, `hint`, `hashState`, `serialize` |
 | `js/content.js` | 40 Journey stages, 5 lessons, 6 challenges, 3 practice paces, daily generator, 5 themes, validators, rival generator |
 | `js/store.js` | Versioned, checksummed localStorage save; settings defaults; local leaderboard; achievement definitions |
 | `js/audio.js` | WebAudio buses, authored Opus clips with synth fallbacks, room-tone loop, generative pad, captions |
 | `js/ui.js` | DOM builders: mode list, journey grid, setup bodies, settings form, help, profile, leaderboard, station mirror, upgrade panel, results table |
-| `js/render.js` | Three.js scene: instanced floor, walls, counter, tables, stoves, waiters, guests, pick layer, camera, quality tiers |
+| `js/render.js` | Three.js scene: instanced floor, walls, counter, tables, stoves, waiters, guests, pick layer, camera; graphics application (`setGraphics`, `graphicsInfo`), post chain, adaptive resolution, GPU probe |
+| `js/gfx.js` | Pure graphics quality model: presets, categories, `detectPreset`, `resolve`, `choosePreset`, `setOverride`, `presetTier`, `describe` |
+| `js/gfx-panel.js` | Graphics section of the Settings screen (built into `#gfx-section`) |
+| `js/gfx-strings.js` | Graphics-section strings for en-US, en-GB, es-419, es-ES, de-DE, fr-FR, fr-CA, pt-BR, it-IT and the `navigator.language` locale pick |
+| `vendor/three/addons/` | three r160 addons: EffectComposer, RenderPass, ShaderPass, OutputPass, GTAOPass, UnrealBloomPass, SMAAPass, FXAAShader, RoomEnvironment and their imports |
 | `js/main.js` | Bootstrap, screen state machine, fixed-step loop, command dispatch + replay envelope, undo, lessons, HUD, input, persistence, host API |
 | `css/game.css` | Layout tokens, rails/drawers, HUD, screens, responsive and accessibility modes |
 | `server.js` | StarHermit `server=` script: static host + `/api/v1/{time,scores,events}` with deterministic replay validation |
@@ -34,7 +38,7 @@
 | `sfx/*.opus`, `sfx/manifest.txt` | 20 authored clips and the canonical event binding table (`manifest.json` feeds the generator, `manifest.md` is generated) |
 | `assets/key-art.webp`, `assets/results-win.webp`, `assets/results-lose.webp` | Title key art and results illustrations |
 | `coverart.png`, `icon.png`, `favicon.svg`, `starhermit.txt` | Platform packaging |
-| `tests/run-tests.js`, `tests/e2e.mjs` | Offline rules/content/server suite (`npm test`) and real-browser playthrough (`npm run test:e2e`) |
+| `tests/run-tests.js`, `tests/gfx.test.mjs`, `tests/e2e.mjs` | Offline rules/content/server suite and graphics-model unit tests (`npm test`), and real-browser playthrough (`npm run test:e2e`) |
 
 ## 2. Vision and design pillars
 
@@ -172,7 +176,7 @@ Every screen is a `.screen[role=dialog][aria-label=<name>]` sheet (max 720 px) o
 
 **Palette (CSS tokens).** Background `#14100d`, panel `#211a15`, panel-2 `#2b221b`, ink `#f2e9dd`, dim ink `#b8a894`, accent `#e8a54b`, danger `#e0574d`, ok `#7fd08a`, focus `#ffd27a`. High contrast: `#000/#101010/#1c1c1c`, ink `#fff`, accent `#ffd27a`, focus `#00e0ff`. High-visibility palette: accent `#ffb340`, danger `#ff6f61`, ok `#4dd0e1`.
 
-**Scene colours (`render.js`).** Background `0x14100d`; key light `0xfff2dd` @2.2 from (6,12,4) with 1024² PCF soft shadows; hemisphere fill `0xccc4b8`/`0x30231a` @0.9; ACES tone mapping at exposure 1.05, sRGB output. Player waiter `0xe8a54b`, helpers `0x7ec8e8`, skin `0xf0d8b8`, guest bodies cycle `0xc96f4a, 0x6f8fc9, 0x8fc96f, 0xc9c06f, 0xa06fc9`; patience ring lerps green `0x7fd08a` → amber `0xffb35c` → red `0xe0574d` at 50 % / 0 %; legal-target ring `0xffd27a`.
+**Scene colours (`render.js`).** Background `0x14100d`; key light `0xffeedd` @2.2 from direction (6,12,4) aimed at the room centre, PCF soft shadows whose orthographic box is fitted to the room plus a 1-unit margin; hemisphere fill `0xd8ccbc`/`0x30231a` @0.9 (0.55 when reflections are on); ACES tone mapping at exposure 1.05, sRGB output. Player waiter `0xe8a54b`, helpers `0x7ec8e8`, skin `0xf0d8b8`, guest bodies cycle `0xc96f4a, 0x6f8fc9, 0x8fc96f, 0xc9c06f, 0xa06fc9`; patience ring lerps green `0x7fd08a` → amber `0xffb35c` → red `0xe0574d` at 50 % / 0 %; legal-target ring `0xffd27a`.
 
 **Theme table (`content.js THEMES`).**
 
@@ -184,13 +188,24 @@ Every screen is a `.screen[role=dialog][aria-label=<name>]` sheet (max 720 px) o
 | Sunset | #ff8a6b | 54343a / 613e44 | 33222a | 8a5a48 | 6e463c | b3503e | 96898a | ffb08a |
 | Frost | #7ec8e8 | 36444f / 40505c | 232e36 | 5c7484 | 4a5e6c | 3e6e8a | 9aa5ad | bfe4f5 |
 
-**Shape language.** Everything is a rounded primitive: capsule bodies with sphere heads, cylinder tables with a cloth disc, box stoves with a pan and a translucent steam sphere, an instanced 0.98-tile checkerboard floor, 0.9-unit walls, a wooden counter along the kitchen row, six seeded wooden props outside the left wall (decor stream, cosmetic). Walled-off tables render at 35 % opacity behind a rotated grey barrier that is removed the tick the wall opens.
+**Shape language.** Everything is a rounded primitive: capsule bodies with sphere heads, cylinder tables with a cloth disc, box stoves with a burner ring, a pan and translucent steam puffs, an instanced 0.98-tile checkerboard floor, 0.9-unit walls, a wooden counter along the kitchen row, six seeded wooden props outside the left wall (decor stream, cosmetic). Walled-off tables render at 35 % opacity behind a rotated grey barrier that is removed the tick the wall opens.
+
+**Graphics.** Materials are PBR (`MeshStandardMaterial`; clearcoat `MeshPhysicalMaterial` on table tops, tray plates, the polished counter slab and, with surface detail, the floor tiles). Optional effects, each a setting: key-light shadows (1024²/2048²/4096²); image-based lighting from a PMREM-filtered `RoomEnvironment` (reflections on metal stoves, pans, trays and glossy pieces; envMapIntensity 0.35–0.5); GTAO ambient occlusion for contact darkening; bloom limited to emissive sources (threshold 0.92: candle flames, festoon bulbs, lit burners, the door glow); a colour grade after the output pass (gentle S-curve, +10 % saturation, warm highlights / cool shadows, vignette 0.24); FXAA, SMAA or MSAA. **Surface detail** adds procedural canvas textures (speckled, bevel-edged floor tiles; wood grain on tables, legs, counter and props; mottled plaster walls), a dark wood cap rail on every wall, a stone counter slab, a table candle per table, a festoon of warm bulbs strung above the back wall between two posts, and a dim pool of street light outside the room that fades into the backdrop. **Steam particles** High gives each cooking stove six rising, swelling, fading puffs (Low: one bobbing puff). **Ambient animation** flickers candles, bulbs and burners and gives guests a slow idle bob; all of it stops under Reduced motion. Burners glow orange only while their stove cooks. The post chain is RenderPass → GTAO → UnrealBloom → OutputPass → grade → SMAA/FXAA into a HalfFloat target (4× MSAA samples when anti-aliasing is MSAA); it is built only when an effect needs it and rebuilt when its settings or size change. If it cannot be built or throws, the room renders directly and the Graphics section says post-processing is unavailable (nothing is logged to the console). Pixel ratio is `min(dpr, 2) × preset scale × render scale × adaptive scale`; adaptive resolution averages 90 frames and steps down 0.1 (to 0.6) when a frame averages over 26 ms, back up 0.05 (to 1) under 14 ms.
+
+**Graphics settings.** Settings → **Graphics** (reachable from the title and the pause menu) offers: Quality (`#gfx-preset`: Auto (detected: …), Low, Balanced, High, Ultra), Render scale (`#gfx-scale`, 50–200 %), one select per effect (`#gfx-shadows`, `#gfx-ao`, `#gfx-bloom`, `#gfx-grade`, `#gfx-antialias`, `#gfx-reflections`, `#gfx-particles`, `#gfx-detail`, `#gfx-animation`, each defaulting to "From preset (…)"), Adaptive resolution (`#gfx-adaptive`, default on), Show frame rate (`#gfx-fps`, default off; a small `#fps-meter` pill bottom-left shows fps and pixel ratio), and a summary line (`#gfx-summary`) "GPU · cost summary · W×H px". Auto uses the unmasked WebGL renderer string (Firefox's plain `RENDERER`, Chromium's `WEBGL_debug_renderer_info`): SwiftShader/llvmpipe/software → Low, discrete NVIDIA/AMD or Apple M → High, else Balanced; touch/mobile devices cap Auto at Balanced. Choosing a preset clears overrides. Changes apply live (shadow map, environment, post chain, pixel ratio; a canvas-MSAA change on the direct path swaps the WebGL renderer; surface detail and particle count rebuild the board) and persist in the save document as `settings.gfx` (a legacy `graphicsTier` migrates to a preset). `body[data-gfx-preset]` exposes the resolved preset.
+
+| Preset | Scale | Shadows | AO | Bloom | Grade | AA | Reflections | Steam | Detail | Animation |
+|---|---|---|---|---|---|---|---|---|---|---|
+| Low | 0.85 | off | off | off | off | MSAA (canvas) | off | low | plain | static |
+| Balanced | 1 | 1024² | off | on | on | FXAA | on | low | detailed | animated |
+| High | 1 | 2048² | on | on | on | SMAA | on | high | detailed | animated |
+| Ultra | 1.25 | 4096² | high | on | on | MSAA (target) | on | high | detailed | animated |
 
 **Hero.** The room itself, framed by a 38° perspective camera at elevation `11 × span/9` and offset `8.5 × span/9` looking at the room centre, so any grid from 9×7 to 13×11 fills the playfield. The player waiter carries a pulsing amber ring so the eye always finds the tray.
 
 **Typography.** System UI stack, 16 px base (20 px with Larger text), tabular numerals on chips and tables, the logo at `clamp(2em, 7vw, 3.4em)` in accent. Line length capped at 70 ch for descriptions and help.
 
-**Motion.** Waiters lerp between tick positions with the frame alpha; steam bobs on a sine of the tick; the player ring pulses; serve gives a 0.03-amplitude 0.18 s camera impulse and win/lose 0.08/0.4 s, after which `frameCamera` restores the authored pose. Drawers slide 0.22 s. **Reduced motion** removes interpolation (snap), steam, ring pulse, camera impulses, drawer transitions and every CSS transition, and shortens the countdown cadence to 200 ms.
+**Motion.** Waiters lerp between tick positions with the frame alpha; steam bobs on a sine of the tick (or rises in puffs at High particles); candles, bulbs and burners shimmer and guests idle-bob when ambient animation is on; the player ring pulses; serve gives a 0.03-amplitude 0.18 s camera impulse and win/lose 0.08/0.4 s, after which `frameCamera` restores the authored pose. Drawers slide 0.22 s. **Reduced motion** removes interpolation (snap), steam, flicker and idle bob, ring pulse, camera impulses, drawer transitions and every CSS transition, and shortens the countdown cadence to 200 ms.
 
 **Visual assets the design calls for.** Title key art (miniature bistro diorama, 16:9), a win illustration (cleared table, full tip jar) and a loss illustration (closed room, empty jar) for results, and a platform cover derived from the key art. All four ship (see §15). Board geometry is deliberately procedural, so no 3D model asset is required.
 
@@ -227,7 +242,7 @@ Every screen is a `.screen[role=dialog][aria-label=<name>]` sheet (max 720 px) o
 
 ## 10. Localization
 
-English only ships: every string is an inline literal in `ui.js`, `main.js` and `content.js`, `index.html` declares `lang="en"`, and there is no language selector or locale detection. The required locale set (en-US, en-GB, es-419, es-ES, de-DE, fr-FR, fr-CA, pt-BR, it-IT) is listed under "Design intent not yet implemented". Layout already tolerates ~30 % expansion: chips wrap, cards and help text cap at 70 ch, buttons are `inline-flex` with wrapping rows, and the level grid uses numbers only.
+English only ships, except the Graphics settings section: its strings live in `js/gfx-strings.js` for all nine required locales and follow `navigator.language`. Every other string is an inline literal in `ui.js`, `main.js` and `content.js`, `index.html` declares `lang="en"`, and there is no language selector. The required locale set (en-US, en-GB, es-419, es-ES, de-DE, fr-FR, fr-CA, pt-BR, it-IT) is listed under "Design intent not yet implemented". Layout already tolerates ~30 % expansion: chips wrap, cards and help text cap at 70 ch, buttons are `inline-flex` with wrapping rows, and the level grid uses numbers only.
 
 ## 11. Accessibility
 
@@ -256,17 +271,17 @@ Conventions per https://wiki.starhermit.com/ — packaging via `starhermit.txt` 
 
 - **`rules.js`** is pure: no DOM, no `Date`, no `Math.random`; state is plain JSON with a `v` field; `hashState` uses a stable key-sorted stringify over everything but `events`. The same file runs in Node for tests and the server.
 - **`main.js`** owns the session object `{state, cfg, mode, lesson, commands, hashes, cmdIds, undoStack, over, paused, acc, prev, speed, urgentSeen, …}`, the `requestAnimationFrame` loop (dt clamped to 250 ms, up to 40 ticks per frame, a hash every 50 ticks), event draining to audio/announcements/lessons, and the replay envelope.
-- **`render.js`** consumes snapshots (`sync(state, prev, alpha)`), never mutates them, and rejects a state whose `cfg` identity differs (undo therefore rebuilds). Picking raycasts only the `LAYER_PICK` proxies (table cylinders, stove boxes, floor plane). Quality tiers: low (DPR 1, no shadows), medium (DPR ≤1.5), high (DPR ≤2); "auto" picks medium on mobile user agents. Hidden tabs render nothing.
+- **`render.js`** consumes snapshots (`sync(state, prev, alpha)`), never mutates them, and rejects a state whose `cfg` identity differs (undo therefore rebuilds). Picking raycasts only the `LAYER_PICK` proxies (table cylinders, stove boxes, floor plane). Graphics quality comes from `gfx.js` via `setGraphics(resolved)` (see §8 Graphics). Hidden tabs render nothing.
 - **Persistence (`store.js`):** `bistrobuilder.save.v1` = `{sum: FNV-1a(payload), payload}` with settings + progress; a bad checksum or a future version yields a fresh document; a memory fallback covers private mode. `bistrobuilder.leaderboards.v1` holds the local board (top 100). Tokens and identity are never stored.
 - **Determinism:** rules stream (`0x9e3779b9`) for the simulation, decor stream (`0x85ebca6b`) for props and rival scores, AV stream (`0xc2b2ae35`) for pitch variants; cosmetic streams never feed rules.
-- **Budgets (by construction, not yet profiled):** one instanced floor draw, four walls, counter, one instanced prop mesh, ≤3 meshes + ring per table, 3 per stove, 3–4 per figure, one shadow-casting light; the mirror DOM is rebuilt per tick (≤ 10 Hz) and is the main CPU cost on low-end phones.
-- **E2E drive:** `tests/e2e.mjs` runs its own static server with `/api/v1` stubs, opens headless Chrome via `playwright-core`, and plays only through visible UI — it reads the station mirror for state, clicks the mirror's Serve/Pick-up buttons at 1280×800 and presses the documented `1–9`/`K` keys at 390×844 (touch), toggles fast-forward with the real button, and fails on any `pageerror` or console error.
+- **Budgets (by construction, not yet profiled):** one instanced floor draw, four walls, counter, one instanced prop mesh, ≤3 meshes + ring per table, 3 per stove, 3–4 per figure, one shadow-casting light; the Low preset renders directly with no shadow map and no post chain at 0.85× pixel ratio; the mirror DOM is rebuilt per tick (≤ 10 Hz) and is the main CPU cost on low-end phones.
+- **E2E drive:** `tests/e2e.mjs` runs its own static server with `/api/v1` stubs, opens headless Chrome via `playwright-core` (falling back to Playwright's Firefox with software WebGL when Chrome's headless compositor cannot screenshot; `E2E_BROWSER=chrome|firefox` forces one), and plays only through visible UI — it reads the station mirror for state, clicks the mirror's Serve/Pick-up buttons at 1280×800 and presses the documented `1–9`/`K` keys at 390×844 (touch), toggles fast-forward with the real button, and fails on any `pageerror`, console error or console warning.
 
 ## 14. Testing and acceptance criteria
 
-`npm test` (`tests/run-tests.js`, 18 tests): initial state and hash; serve/pickup legality and every invalid reason; payout = price + tip and the total formula; buy caps, funds and mechanics flags; expansion and helper hiring; goal win / day fail / resign terminals and post-terminal rejection; lost-guest penalty; serialize round-trip and version rejection; deterministic replay hash equality; fuzzed malformed commands never hang or produce NaN; every content config passes `validateAll`; 40 stages with mastery every fifth; daily determinism per date; golden bot sessions terminate on easy/medium/hard/challenge/daily; save migration and future-version refusal; leaderboard tie order; achievement key shape; and a live server check (time, static files, `server.js` forbidden, honest envelope accepted, duplicate replaced, inflated score / stale version / unknown content rejected with 422, 404 shape).
+`npm test` runs `tests/run-tests.js` (18 tests) and `tests/gfx.test.mjs` (12 tests: `detectPreset` on sample GPU strings and the mobile cap, `resolve` with preset/override/scale clamp, presets clearing overrides, `describe`, Low cost bound, graphics strings for every locale, `settings.gfx` defaults and legacy migration). `run-tests.js` covers: initial state and hash; serve/pickup legality and every invalid reason; payout = price + tip and the total formula; buy caps, funds and mechanics flags; expansion and helper hiring; goal win / day fail / resign terminals and post-terminal rejection; lost-guest penalty; serialize round-trip and version rejection; deterministic replay hash equality; fuzzed malformed commands never hang or produce NaN; every content config passes `validateAll`; 40 stages with mastery every fifth; daily determinism per date; golden bot sessions terminate on easy/medium/hard/challenge/daily; save migration and future-version refusal; leaderboard tie order; achievement key shape; and a live server check (time, static files, `server.js` forbidden, honest envelope accepted, duplicate replaced, inflated score / stale version / unknown content rejected with 422, 404 shape).
 
-`npm run test:e2e` (`tests/e2e.mjs`): title visible → Settings toggles reduced motion on `<body>` and closes → Help opens/closes → Learn lesson 1 to "Lesson complete!" → Journey grid shows 40 cells with stage 1 unlocked → stage 1 played to a real results headline → progress persisted in localStorage → Play again → Pause freezes the clock → Resume → `U` rewinds and the clock keeps running → Leave service → resign results → Home. Desktop pass then mobile pass; zero page errors.
+`npm run test:e2e` (`tests/e2e.mjs`): title visible → Settings toggles reduced motion on `<body>` and closes → Graphics: Low then High (checks `body[data-gfx-preset]` and the summary), Shadows override Off and Show frame rate on, reload, both survive, back to Auto (overrides cleared) → Help opens/closes → Learn lesson 1 to "Lesson complete!" → Journey grid shows 40 cells with stage 1 unlocked → stage 1 played to a real results headline → progress persisted in localStorage → Play again → Pause freezes the clock → Resume → `U` rewinds and the clock keeps running → Pause → Settings → Ultra, two seconds of play at Ultra, back to Auto → Leave service → resign results → Home. Desktop pass then mobile pass; zero page errors.
 
 **QA bar (checkable):**
 - A new player sees instructions within one screen (title tip → Learn) and per-mechanic guidance (lesson step text + continuous hint line).
@@ -288,12 +303,14 @@ Conventions per https://wiki.starhermit.com/ — packaging via `starhermit.txt` 
 | `sfx/service-open-bell.opus`, `wall-knock.opus`, `patience-tick.opus`, `helper-hired.opus` | New event one-shots | MOSS-SoundEffect v2.0, 100 steps, seeds from the tool's name hash | generated in this pass, wired |
 | `sfx/bistro-ambience.opus` (10 s) | Ambience-bus loop | MOSS-SoundEffect v2.0, 100 steps | generated in this pass, wired |
 | `sfx/manifest.txt` | Canonical clip → event → description → context table | hand-authored | generated in this pass |
-| `vendor/three.module.min.js` | Renderer | three.js (MIT) | shipped |
+| `vendor/three.module.min.js` | Renderer | three.js r160 (MIT) | shipped |
+| `vendor/three/addons/**` | Post-processing passes, shaders, RoomEnvironment | three.js 0.160.1 `examples/jsm` (MIT), same revision as the build | shipped |
 | 3D models / character animation | — | — | none required: geometry is procedural and figures are capsules (no rig) |
 
 ## 16. Known limitations
 
-- Localization: English only (§10).
+- Localization: English only (§10), except the Graphics settings section.
+- On software WebGL (llvmpipe) at low resolution, bloom around the tiny festoon bulbs can show faint square halos; hardware GPUs filter the bloom mips smoothly.
 - Presence, cloud save and platform-side achievements/leaderboards are not called; boards are the game's own `server.js` plus a local fallback, and "house regulars" are seeded rivals, not real players.
 - The "Rewind" toast says "one second" but the snapshot cadence is one per accepted command; a rewind is "before your last command".
 - Queued guests who have no table drain patience while standing at the door, so an over-full queue can lose guests you never had a chance to serve.

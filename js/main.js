@@ -5,6 +5,8 @@
  * integration (server time, score submission) with full offline fallback.
  */
 import * as BBRender from './render.js';
+import { resolve as resolveGfx, detectPreset } from './gfx.js';
+import { buildGraphicsSection } from './gfx-panel.js';
 
 (function () {
   'use strict';
@@ -249,21 +251,62 @@ import * as BBRender from './render.js';
   var view = null;
   function ensureView() {
     if (view) return true;
-    view = BBRender.create(playfield, {});
+    var g0 = gfxResolved();
+    view = BBRender.create(playfield, {
+      antialias: g0.antialias === 'msaa' && !g0.post,
+      onCanvas: function (c) { c.addEventListener('pointerdown', onPointerDown); }
+    });
     if (!view) {
       var fb = el('div', 'canvas-fallback',
         '3D graphics are unavailable in this browser. The station panel on the right is a full text version of the bistro — the game remains playable. Your progress is saved.');
       playfield.appendChild(fb);
       return false;
     }
-    view.domElement.addEventListener('pointerdown', onPointerDown);
-    view.setQuality(qualityTier(), settings);
+    gpuName = view.graphicsInfo().gpu || gpuName;
+    applyGraphics();
     return true;
   }
-  function qualityTier() {
-    if (settings.graphicsTier !== 'auto') return settings.graphicsTier;
-    var mobile = /Mobi|Android/i.test(navigator.userAgent);
-    return mobile ? 'medium' : 'high';
+
+  // ---------- graphics quality (js/gfx.js) ----------
+  var gpuName = null;
+  function isMobile() {
+    var coarse = false;
+    try { coarse = window.matchMedia('(pointer: coarse)').matches; } catch (e) {}
+    return coarse || /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
+  }
+  function detectedPreset() {
+    if (gpuName == null) gpuName = BBRender.probeGpu();
+    return detectPreset(gpuName, isMobile());
+  }
+  function gfxResolved() { return resolveGfx(settings.gfx, detectedPreset()); }
+  function fpsMeter(on) {
+    var m = document.getElementById('fps-meter');
+    if (on && !m) {
+      m = el('div', null, '… fps');
+      m.id = 'fps-meter';
+      m.setAttribute('aria-hidden', 'true');
+      document.body.appendChild(m);
+    }
+    if (m) m.hidden = !on;
+  }
+  // Applies graphics live (no reload); rebuilds the board only when surface
+  // detail or particle count changed.
+  function applyGraphics(skipRebuild) {
+    var r = gfxResolved();
+    document.body.setAttribute('data-gfx-preset', r.preset);
+    document.body.setAttribute('data-gfx-auto', r.auto ? 'true' : 'false');
+    fpsMeter(r.showFps);
+    if (!view) return;
+    var res = view.setGraphics(r, settings);
+    if (res.rebuild && game && !skipRebuild)
+      view.build(game.state, C.THEMES[settings.theme] || C.THEMES.ember, game.cfg.seed, settings);
+  }
+  function graphicsInfo() {
+    if (view) return view.graphicsInfo();
+    var r = gfxResolved();
+    var ratio = Math.min(window.devicePixelRatio || 1, 2) * r.scale;
+    var pf = playfield || document.body;
+    return { gpu: gpuName, pixels: [Math.round((pf.clientWidth || window.innerWidth) * ratio), Math.round((pf.clientHeight || window.innerHeight) * ratio)], postFailed: false };
   }
 
   // ---------- session ----------
@@ -786,6 +829,20 @@ import * as BBRender from './render.js';
       form.id = 'settings-form';
       sheet.appendChild(form);
       U.buildSettingsForm(form, settings, C.THEMES, {
+        buildGraphics: function (box) {
+          buildGraphicsSection(box, {
+            locale: navigator.language,
+            saved: function () { return settings.gfx; },
+            detected: detectedPreset,
+            info: graphicsInfo,
+            onChange: function (next) {
+              settings.gfx = next;
+              persist();
+              applyGraphics();
+              funnel('settings-change', { key: 'gfx' });
+            }
+          });
+        },
         onChange: function (key, value) {
           settings[key] = value;
           persist();
@@ -861,7 +918,7 @@ import * as BBRender from './render.js';
     document.body.classList.toggle('high-visibility', settings.colorPalette === 'high-visibility');
     A.applySettings(settings);
     A.setCaptions(!!settings.captions);
-    if (view) view.setQuality(qualityTier(), settings);
+    applyGraphics(true);
     if (game && view) view.build(game.state, C.THEMES[settings.theme] || C.THEMES.ember, game.cfg.seed, settings);
     if (game) updateHud();
   }

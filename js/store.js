@@ -15,7 +15,9 @@
   var DEFAULT_SETTINGS = {
     music: 0.5, effects: 0.9, ambience: 0.5, voice: 0.8,
     muted: false, captions: false,
-    graphicsTier: 'auto',       // auto | low | medium | high
+    // graphics quality (js/gfx.js): preset auto|low|balanced|high|ultra,
+    // render_scale 0.5–2, adaptive, show_fps, plus optional per-category overrides
+    gfx: { preset: 'auto', render_scale: 1, adaptive: true, show_fps: false },
     theme: 'ember',
     reducedMotion: false,
     highContrast: false,
@@ -48,18 +50,29 @@
     return (h >>> 0).toString(36);
   }
 
+  function copySettings(saved) {
+    var s = Object.assign({}, DEFAULT_SETTINGS, saved || {});
+    var gfx = Object.assign({}, DEFAULT_SETTINGS.gfx, (saved && typeof saved.gfx === 'object' && saved.gfx) || {});
+    // legacy single quality tier → graphics preset (overrides stay empty)
+    if (saved && !saved.gfx && saved.graphicsTier && saved.graphicsTier !== 'auto')
+      gfx.preset = { low: 'low', medium: 'balanced', high: 'high' }[saved.graphicsTier] || 'auto';
+    delete s.graphicsTier;
+    s.gfx = gfx;
+    return s;
+  }
+
   function migrate(doc) {
     // v1 is current; older shapes are upgraded field-by-field here.
     if (!doc || typeof doc !== 'object') return null;
     if (doc.v > SAVE_VERSION) return null; // future format: don't clobber
     doc.v = SAVE_VERSION;
-    doc.settings = Object.assign({}, DEFAULT_SETTINGS, doc.settings || {});
+    doc.settings = copySettings(doc.settings);
     doc.progress = Object.assign(defaultProgress(), doc.progress || {});
     return doc;
   }
 
   function fresh() {
-    return { v: SAVE_VERSION, settings: Object.assign({}, DEFAULT_SETTINGS), progress: defaultProgress() };
+    return { v: SAVE_VERSION, settings: copySettings(null), progress: defaultProgress() };
   }
 
   var memoryFallback = null; // used when localStorage is unavailable

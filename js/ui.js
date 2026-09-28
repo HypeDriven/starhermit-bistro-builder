@@ -158,10 +158,13 @@
     row('Voice', range('voice', 0, 1, 0.05));
     row('Mute all', check('muted'));
     row('Captions for sound cues', check('captions'));
-    form.appendChild(el('h3', null, 'Graphics'));
-    row('Quality tier', select('graphicsTier', [
-      { value: 'auto', label: 'Auto' }, { value: 'low', label: 'Low' },
-      { value: 'medium', label: 'Medium' }, { value: 'high', label: 'High' }]));
+    if (opts.buildGraphics) { // quality presets + per-effect overrides (js/gfx-panel.js)
+      var gfx = el('div', 'gfx-section');
+      gfx.id = 'gfx-section';
+      form.appendChild(gfx);
+      opts.buildGraphics(gfx);
+    }
+    form.appendChild(el('h3', null, 'Display'));
     row('Theme', select('theme', Object.keys(themes).map(function (k) {
       return { value: k, label: themes[k].name };
     })));

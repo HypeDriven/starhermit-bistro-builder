@@ -180,6 +180,22 @@ button, select, input { font: inherit; color: inherit; }
 .setting-row select { background: var(--panel-2); border: 1px solid #00000066; border-radius: 6px; padding: .35em .5em; min-height: 36px; }
 .setting-row input[type=checkbox] { width: 24px; height: 24px; }
 #settings-form h3 { color: var(--accent); margin: .9em 0 .2em; }
+.setting-row select { color: var(--ink); }
+.gfx-section .setting-row { flex-wrap: wrap; row-gap: .3em; }
+.gfx-section .setting-row > span:first-child { flex: 1 1 9em; }
+.gfx-section .setting-row select { margin-left: auto; max-width: 100%; min-width: 0; }
+.gfx-scale { display: flex; align-items: center; gap: .5em; flex: 1 1 12em; max-width: 24em; margin-left: auto; }
+.gfx-scale input[type=range] { flex: 1; width: auto; min-width: 0; min-height: 36px; }
+.gfx-scale-out { min-width: 3.4em; text-align: right; font-variant-numeric: tabular-nums; }
+.gfx-summary { margin: .6em 0 .2em; overflow-wrap: anywhere; }
+.gfx-note { color: var(--accent); margin: .2em 0; }
+#fps-meter {
+  position: fixed; z-index: 40; pointer-events: none;
+  left: calc(.5em + var(--sal)); bottom: calc(.5em + var(--sab));
+  background: #000000aa; color: var(--ink); border-radius: 999px;
+  padding: .15em .7em; font: 600 12px/1.6 system-ui, sans-serif; font-variant-numeric: tabular-nums;
+}
+#fps-meter[hidden] { display: none; }
 
 .help-card { background: var(--panel-2); border-radius: var(--radius); padding: .7em 1em; margin-bottom: .6em; }
 .help-card h3 { margin: 0 0 .3em; color: var(--accent); }

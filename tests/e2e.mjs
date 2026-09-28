@@ -15,12 +15,18 @@
  *
  * State synchronization reads the semantic station-mirror DOM (the text
  * version of the 3D board); every action goes through real UI interaction.
- * Any pageerror / console error (minus benign GPU/swiftshader noise) fails
- * the run. Screenshots: /tmp/bistro-builder-e2e-<stage>-<pass>.png.
+ * Graphics: switches the Graphics preset Low → High, overrides one effect,
+ * checks it applied (body[data-gfx-preset] + summary) and survives a reload,
+ * and renders a stretch of play at Ultra.
+ * Any pageerror / console error or warning (minus benign GPU/swiftshader
+ * noise) fails the run. Browser: system Chrome with SwiftShader; if its
+ * compositor cannot produce a screenshot (some WSL/headless setups hang),
+ * falls back to Playwright's Firefox with software WebGL. Force one with
+ * E2E_BROWSER=chrome|firefox. Screenshots: /tmp/bistro-builder-e2e-<stage>-<pass>.png.
  *
  * Run: npm run test:e2e
  */
-import { chromium } from 'playwright-core';
+import { chromium, firefox } from 'playwright-core';
 import http from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { extname, join, normalize } from 'node:path';
@@ -157,7 +163,7 @@ async function runPass(browser, pass, viewport, hasTouch) {
   const page = await context.newPage();
   page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`));
   page.on('console', (m) => {
-    if (m.type() === 'error' && !browserNoise.test(m.text())) errors.push(`console: ${m.text()}`);
+    if ((m.type() === 'error' || m.type() === 'warning') && !browserNoise.test(m.text())) errors.push(`console ${m.type()}: ${m.text()}`);
   });
 
   const step = async (name, fn) => { await fn(); console.log(`ok - [${pass}] ${name}`); };
@@ -179,6 +185,45 @@ async function runPass(browser, pass, viewport, hasTouch) {
         throw new Error('reduced-motion setting did not apply to <body>');
       await page.screenshot({ path: SHOT('settings', pass) });
       await row.uncheck();
+      await page.getByRole('button', { name: '← Back' }).click();
+      await page.waitForSelector('.screen[aria-label="title"]');
+    });
+
+    await step('graphics: preset Low → High, override shadows, persists across reload', async () => {
+      const gfxState = () => page.evaluate(() => ({
+        body: document.body.getAttribute('data-gfx-preset'),
+        summary: document.querySelector('#gfx-summary')?.textContent || '',
+        preset: document.querySelector('#gfx-preset')?.value,
+        shadows: document.querySelector('#gfx-shadows')?.value,
+        fps: !!document.querySelector('#fps-meter:not([hidden])'),
+      }));
+      await page.getByRole('button', { name: 'Settings', exact: true }).click();
+      await page.waitForSelector('#gfx-section #gfx-preset');
+      const autoLabel = await page.locator('#gfx-preset option[value="auto"]').textContent();
+      if (!/\(.+\)/.test(autoLabel)) throw new Error('auto option lacks detected tier: ' + autoLabel);
+      await page.locator('#gfx-preset').selectOption('low');
+      let g = await gfxState();
+      if (g.body !== 'low' || !/no shadows/.test(g.summary)) throw new Error('Low preset not applied: ' + JSON.stringify(g));
+      await page.locator('#gfx-preset').selectOption('high');
+      g = await gfxState();
+      if (g.body !== 'high' || !/2048² shadows/.test(g.summary)) throw new Error('High preset not applied: ' + JSON.stringify(g));
+      await page.locator('#gfx-shadows').selectOption('off');
+      await page.locator('#gfx-fps').check();
+      g = await gfxState();
+      if (g.shadows !== 'off' || !/no shadows/.test(g.summary) || !g.fps) throw new Error('override not applied: ' + JSON.stringify(g));
+      await page.screenshot({ path: SHOT('graphics', pass) });
+      await page.reload({ waitUntil: 'load' });
+      await page.waitForSelector('.screen[aria-label="title"] .logo');
+      await page.getByRole('button', { name: 'Settings', exact: true }).click();
+      await page.waitForSelector('#gfx-section #gfx-preset');
+      g = await gfxState();
+      if (g.body !== 'high' || g.preset !== 'high' || g.shadows !== 'off' || !g.fps)
+        throw new Error('graphics settings did not survive reload: ' + JSON.stringify(g));
+      // choosing a preset clears overrides; back to Auto (software GPU → Low) for fast play
+      await page.locator('#gfx-preset').selectOption('auto');
+      await page.locator('#gfx-fps').uncheck();
+      g = await gfxState();
+      if (g.preset !== 'auto' || g.shadows !== 'preset' || g.fps) throw new Error('preset did not clear overrides: ' + JSON.stringify(g));
       await page.getByRole('button', { name: '← Back' }).click();
       await page.waitForSelector('.screen[aria-label="title"]');
     });
@@ -265,6 +310,20 @@ async function runPass(browser, pass, viewport, hasTouch) {
       if (!c1 || c1 === c2) throw new Error(`clock frozen after rewind (${c1} -> ${c2})`);
       await page.getByRole('button', { name: 'Pause', exact: true }).click();
       await page.waitForSelector('.screen[aria-label="Paused"]');
+      // a stretch of play at Ultra (full post chain), then back to Auto
+      await page.getByRole('button', { name: 'Settings', exact: true }).click();
+      await page.locator('#gfx-preset').selectOption('ultra');
+      if (await page.evaluate(() => document.body.getAttribute('data-gfx-preset')) !== 'ultra') throw new Error('Ultra not applied');
+      await page.getByRole('button', { name: '← Back' }).click();
+      await page.getByRole('button', { name: '▶ Resume' }).click();
+      await page.waitForSelector('.screen[aria-label="Paused"]', { state: 'detached' });
+      await page.waitForTimeout(2000);
+      await page.screenshot({ path: SHOT('ultra', pass) });
+      await page.getByRole('button', { name: 'Pause', exact: true }).click();
+      await page.getByRole('button', { name: 'Settings', exact: true }).click();
+      await page.locator('#gfx-preset').selectOption('auto');
+      await page.getByRole('button', { name: '← Back' }).click();
+      await page.waitForSelector('.screen[aria-label="Paused"]');
       await page.getByRole('button', { name: 'Leave service' }).click();
       await page.waitForSelector('.screen .results-table', { timeout: 10000 });
       const head = await page.textContent('.outcome-head');
@@ -285,10 +344,36 @@ async function runPass(browser, pass, viewport, hasTouch) {
 await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
 console.log(`static server on http://127.0.0.1:${server.address().port}/`);
 
-const browser = await chromium.launch({
-  executablePath: '/usr/bin/google-chrome',
-  args: ['--no-sandbox', '--enable-unsafe-swiftshader'],
-});
+async function launchChrome() {
+  return chromium.launch({
+    executablePath: '/usr/bin/google-chrome',
+    args: ['--no-sandbox', '--enable-unsafe-swiftshader'],
+  });
+}
+async function launchFirefox() {
+  return firefox.launch({ firefoxUserPrefs: { 'webgl.force-enabled': true }, env: { ...process.env, LIBGL_ALWAYS_SOFTWARE: '1' } });
+}
+/** Chrome unless its headless compositor cannot take a screenshot here. */
+async function pickBrowser() {
+  const want = process.env.E2E_BROWSER;
+  if (want === 'firefox') return launchFirefox();
+  let b = null;
+  try {
+    b = await launchChrome();
+    if (want === 'chrome') return b;
+    const p = await b.newPage();
+    await p.setContent('<p>probe</p>', { timeout: 15000 });
+    await p.screenshot({ timeout: 15000 });
+    await p.close();
+    return b;
+  } catch {
+    console.log('system Chrome cannot render headless screenshots here; using Firefox (software WebGL)');
+    if (b) b.close().catch(() => {});
+    return launchFirefox();
+  }
+}
+const browser = await pickBrowser();
+console.log(`browser: ${browser.browserType().name()} ${browser.version()}`);
 try {
   await runPass(browser, 'desktop', { width: 1280, height: 800 }, false);
   await runPass(browser, 'mobile', { width: 390, height: 844 }, true);
