@@ -327,3 +327,7 @@ Conventions per https://wiki.starhermit.com/ — packaging via `starhermit.txt` 
 - A per-second undo snapshot cadence to match the "Rewound one second" wording, or reword the toast.
 - Item-specific synth/clip cues for tray and stove purchases (currently the generic cash register).
 - Voice-bus content (a short greeter line on service start) and haptic pulses on `urgent` and `serve` on devices that support them.
+
+## Browser interference
+
+`browser-guard.js` (loaded from `index.html`) suppresses browser UI that gets in the way of play: the right-click context menu, the iOS long-press callout, copy / cut / paste, and page text selection. Text fields (inputs, textareas, selects, contenteditable) keep normal selection, context menu and clipboard behaviour.
