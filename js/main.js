@@ -1,18 +1,20 @@
 /* Bistro Builder — bootstrap + session + screen flow.
  * Owns the fixed-step simulation loop, command dispatch with idempotent
  * command IDs, replay envelopes, undo snapshots, screen state machine,
- * keyboard/touch/gamepad input, persistence, achievements, and host API
- * integration (server time, score submission) with full offline fallback.
+ * keyboard/touch/gamepad input, persistence, achievements and local boards.
+ * Own-server use: only GET /api/v1/time, and only when signed in.
  */
 import * as BBRender from './render.js';
 import { resolve as resolveGfx, detectPreset } from './gfx.js';
 import { buildGraphicsSection } from './gfx-panel.js';
+import { accountStrings } from './gfx-strings.js';
 
 (function () {
   'use strict';
 
   var R = window.BBRules, C = window.BBContent, S = window.BBStore,
-      U = window.BBUI, A = window.BBAudio, RNG = window.BBRNG;
+      U = window.BBUI, A = window.BBAudio, RNG = window.BBRNG, P = window.BBPlatform;
+  var ACCOUNT = accountStrings(navigator.language);
 
   var BUILD = '1.0.0';
   var el = U.el;
@@ -23,136 +25,28 @@ import { buildGraphicsSection } from './gfx-panel.js';
   function persist() { S.save(doc); }
   var settings = doc.settings;
 
-  // ---------- host API (same-origin /api when hosted; offline-safe) ----------
+  // ---------- server time (signed in only; standalone uses the local clock) ----------
   var serverOffsetMs = null; // round-trip-adjusted server time offset
 
-  // Launch token: fragment #game_token=<jwt> (platform contract), stripped
-  // after the read; query forms kept for local dev. Decoded for sub +
-  // game_scope — the slug is never hard-coded. Memory only, never persisted.
-  var launchToken = null, platformUserId = null, platformSlug = null;
-  var profileNames = {};   // userId -> Promise<string> (cached nicknames)
-  var refreshTimer = null, refreshRetryTimer = null;
+  // StarHermit (js/platform.js over starhermit-sdk.js): launch token and
+  // renewal, nicknames, cloud save, settings KV, bindings. No requests
+  // without a token.
+  var profileFor = P.profileFor;
+  var signedOutNotice = false;
 
-  function decodeJwt(t) {
-    try {
-      var seg = String(t).split('.')[1];
-      if (!seg) return null;
-      var b64 = seg.replace(/-/g, '+').replace(/_/g, '/');
-      b64 += '='.repeat((4 - (b64.length % 4)) % 4);
-      var bin = atob(b64);
-      var bytes = new Uint8Array(bin.length);
-      for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-      return JSON.parse(new TextDecoder().decode(bytes));
-    } catch (e) { return null; }
-  }
-
-  // Fragment first; query params (?token=/?launch_token=) are local-dev only.
-  function readLaunchToken() {
-    try {
-      var h = new URLSearchParams(String(location.hash || '').replace(/^#/, ''));
-      var t = h.get('game_token');
-      if (t) {
-        h.delete('game_token');
-        h.delete('session_id');
-        var rest = h.toString();
-        history.replaceState(null, '', location.pathname + location.search + (rest ? '#' + rest : ''));
-        return t;
-      }
-      var q = new URLSearchParams(location.search);
-      return q.get('game_token') || q.get('token') || q.get('launch_token') || null;
-    } catch (e) { return null; }
-  }
-
-  function initPlatform() {
-    launchToken = readLaunchToken();
-    if (launchToken) {
-      var claims = decodeJwt(launchToken);
-      if (!claims) launchToken = null; // malformed: standalone
-      else {
-        if (typeof claims.sub === 'string' && claims.sub) platformUserId = claims.sub;
-        if (typeof claims.game_scope === 'string' && claims.game_scope) platformSlug = claims.game_scope;
-        if (!platformUserId || !platformSlug) launchToken = null; // not a usable launch token
-      }
-    }
-    if (launchToken) scheduleTokenRefresh();
-  }
-
-  // The token lives 60 min; scoped tokens may re-mint via the game's
-  // launch-token route. Retry a failed re-mint after ~60 s.
-  function scheduleTokenRefresh() {
-    if (refreshTimer) clearInterval(refreshTimer);
-    refreshTimer = setInterval(refreshLaunchToken, 45 * 60 * 1000);
-  }
-  function refreshLaunchToken() {
-    if (!launchToken || !platformSlug) return Promise.resolve(false);
-    return apiPost('/api/v1/games/' + encodeURIComponent(platformSlug) + '/launch-token', {}).then(function (res) {
-      if (res.ok && res.body && typeof res.body.token === 'string' && res.body.token) {
-        launchToken = res.body.token;
-        var claims = decodeJwt(launchToken);
-        if (claims && claims.sub) platformUserId = claims.sub;
-        if (claims && claims.game_scope) platformSlug = claims.game_scope;
-        return true;
-      }
-      retryTokenRefresh();
-      return false;
-    });
-  }
-  function retryTokenRefresh() {
-    if (refreshRetryTimer || !launchToken) return;
-    refreshRetryTimer = setTimeout(function () {
-      refreshRetryTimer = null;
-      refreshLaunchToken();
-    }, 60000);
-  }
-
-  // Display names for board rows: the profile nickname is the only profile
-  // read a game-scoped token may make (never /api/v1/me, never usernames).
-  // Off-platform the call fails and the neutral "Player <id8>" fallback is
-  // used. Cached per id.
-  function profileFor(userId) {
-    if (!userId || typeof userId !== 'string') return Promise.resolve('player');
-    if (profileNames[userId]) return profileNames[userId];
-    var p = apiGet('/api/v1/users/' + encodeURIComponent(userId) + '/profile').then(function (res) {
-      var n = res.ok && res.body && typeof res.body.nickname === 'string' && res.body.nickname
-        ? res.body.nickname : null;
-      return n || ('Player ' + userId.slice(0, 8));
-    });
-    profileNames[userId] = p;
-    return p;
-  }
-
-  function apiHeaders(extra) {
-    var h = extra || {};
-    if (launchToken) h['Authorization'] = 'Bearer ' + launchToken;
-    return h;
-  }
-  function apiGet(path) {
-    return fetch(path, { headers: apiHeaders({ 'Accept': 'application/json' }) })
-      .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); })
-      .catch(function () { return { ok: false, body: { error: 'offline' } }; });
-  }
-  function apiPost(path, payload) {
-    return fetch(path, {
-      method: 'POST', headers: apiHeaders({ 'Content-Type': 'application/json' }),
-      body: JSON.stringify(payload)
-    }).then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); })
-      .catch(function () { return { ok: false, body: { error: 'offline' } }; });
-  }
   function syncServerTime() {
+    if (!P.hosted) return Promise.resolve();
     var t0 = Date.now();
-    return apiGet('/api/v1/time').then(function (res) {
-      if (res.ok && typeof res.body.now === 'number') {
-        var rtt = Date.now() - t0;
-        serverOffsetMs = res.body.now - (t0 + rtt / 2);
-      }
-    });
+    return fetch('/api/v1/time', { headers: { 'Accept': 'application/json', 'Authorization': 'Bearer ' + P.token } })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (body) {
+        var t = body && (Number(body.now) || Number(body.serverTime) || Number(body.epochMs));
+        if (t) serverOffsetMs = t - (t0 + (Date.now() - t0) / 2);
+      })
+      .catch(function () { /* keep the local clock */ });
   }
   function nowMs() { return Date.now() + (serverOffsetMs || 0); }
   function utcDateStr() { return new Date(nowMs()).toISOString().slice(0, 10); }
-
-  function funnel(eventName, data) { // anonymous funnel events only
-    apiPost('/api/v1/events', { event: eventName, data: data || {}, sessionId: sessionId });
-  }
 
   var sessionId = 's-' + RNG.hashString(String(Math.random()) + Date.now()).toString(36);
 
@@ -339,7 +233,6 @@ import { buildGraphicsSection } from './gfx-panel.js';
     buildHudActions();
     updateHud();
     countdownThen('Service begins!', function () {});
-    funnel('round-start', { mode: mode, id: cfg.id });
     if (lesson) renderLessonStep();
     announce(cfg.name + '. Goal: ' + (cfg.goal > 0 ? cfg.goal + ' coins' : 'serve guests') + '.');
   }
@@ -451,7 +344,6 @@ import { buildGraphicsSection } from './gfx-panel.js';
       showBanner('Lesson complete!');
       doc.progress.tutorialDone[game.lesson.id] = true;
       persist();
-      funnel('tutorial-step', { lesson: game.lesson.id, done: true });
       setTimeout(function () { if (game && game.lesson) endGame('lesson-complete'); }, 900);
     } else renderLessonStep();
   }
@@ -632,10 +524,9 @@ import { buildGraphicsSection } from './gfx-panel.js';
       terminal: { reason: t.reason, win: t.win, tick: t.tick, score: t.score },
       sessionId: sessionId, invalid: game.invalidCount, durationMs: t.elapsedMs
     };
-    if (platformUserId) envelope.playerId = platformUserId; // attach board rows to the account
+    if (P.userId) envelope.playerId = P.userId; // attach board rows to the account
     if (game.cfg.ranked) submitScore(envelope);
 
-    funnel('round-end', { mode: game.mode, id: game.cfg.id, win: t.win, score: st.score.total });
     setTimeout(function () { showResults(t, unlocked, envelope); }, 900);
   }
 
@@ -668,15 +559,10 @@ import { buildGraphicsSection } from './gfx-panel.js';
       invalid: envelope.invalid, durationMs: envelope.durationMs,
       cfgId: envelope.cfgId
     };
-    // server-first; fall back to the local board offline
-    apiPost('/api/v1/scores', envelope).then(function (res) {
-      if (!res.ok) {
-        var boards = S.loadBoards();
-        boards.entries.push(entry);
-        boards.entries = S.sortEntries(boards.entries).slice(0, 100);
-        S.saveBoards(boards);
-      }
-    });
+    var boards = S.loadBoards(); // local board (this device)
+    boards.entries.push(entry);
+    boards.entries = S.sortEntries(boards.entries).slice(0, 100);
+    S.saveBoards(boards);
   }
 
   // ---------- screens ----------
@@ -684,6 +570,7 @@ import { buildGraphicsSection } from './gfx-panel.js';
   function closeScreen() {
     if (screenEl) { screenEl.remove(); screenEl = null; }
   }
+  function currentScreenName() { return screenEl ? screenEl.getAttribute('aria-label') : null; }
   function openScreen(buildFn, label) {
     closeScreen();
     screenEl = el('div', 'screen');
@@ -738,6 +625,28 @@ import { buildGraphicsSection } from './gfx-panel.js';
         row2.appendChild(b);
       });
       sheet.appendChild(row2);
+      // StarHermit account: status line, sign-in (platform host, no token), invite (signed in)
+      var acct = el('p', 'mini', accountLine());
+      acct.id = 'account-line';
+      acct.style.textAlign = 'center';
+      sheet.appendChild(acct);
+      if (P.canSignIn() || P.hosted) {
+        var row3 = el('div', 'row');
+        row3.style.justifyContent = 'center';
+        if (P.canSignIn()) {
+          var si = el('button', 'btn', ACCOUNT.signIn);
+          si.type = 'button'; si.id = 'btn-sign-in';
+          si.addEventListener('click', function () { P.signIn(); });
+          row3.appendChild(si);
+        }
+        if (P.hosted) {
+          var inv = el('button', 'btn', ACCOUNT.invite);
+          inv.type = 'button'; inv.id = 'btn-invite';
+          inv.addEventListener('click', copyInvite);
+          row3.appendChild(inv);
+        }
+        sheet.appendChild(row3);
+      }
       var done = Object.keys(doc.progress.tutorialDone).length;
       if (done < 5) {
         var tip = el('p', 'mini', 'New here? Start with Learn — five one-minute lessons.');
@@ -839,7 +748,6 @@ import { buildGraphicsSection } from './gfx-panel.js';
               settings.gfx = next;
               persist();
               applyGraphics();
-              funnel('settings-change', { key: 'gfx' });
             }
           });
         },
@@ -847,7 +755,6 @@ import { buildGraphicsSection } from './gfx-panel.js';
           settings[key] = value;
           persist();
           applySettings();
-          funnel('settings-change', { key: key });
         }
       });
       backToContext(sheet);
@@ -857,7 +764,7 @@ import { buildGraphicsSection } from './gfx-panel.js';
       sheet.appendChild(el('h2', null, 'How to play'));
       var box = el('div');
       sheet.appendChild(box);
-      U.buildHelp(box);
+      U.buildHelp(box, keysText());
       backToContext(sheet);
     },
 
@@ -885,21 +792,12 @@ import { buildGraphicsSection } from './gfx-panel.js';
 
     leaderboard: function (sheet) {
       sheet.appendChild(el('h2', null, 'Leaderboards'));
-      var box = el('div', null, 'Loading…');
+      var box = el('div');
       sheet.appendChild(box);
       var daily = C.dailyCfg(utcDateStr());
-      apiGet('/api/v1/scores?cfgId=' + encodeURIComponent(daily.id)).then(function (res) {
-        var local = S.loadBoards().entries.filter(function (e) { return e.cfgId === daily.id; });
-        var entries = (res.ok && Array.isArray(res.body.entries)) ? res.body.entries.map(function (e) {
-          return {
-            name: e.name, playerId: e.playerId,
-            you: !!(e.playerId && e.playerId === platformUserId),
-            score: e.score, date: e.date
-          };
-        }) : local;
-        U.buildLeaderboard(box, entries, C.rivalScores(daily), 'Today — ' + daily.id, profileFor);
-        if (!res.ok) box.appendChild(el('p', 'mini', 'Offline: showing local scores. Hosted boards sync when connected.'));
-      });
+      var local = S.loadBoards().entries.filter(function (e) { return e.cfgId === daily.id; });
+      U.buildLeaderboard(box, local, C.rivalScores(daily), 'Today — ' + daily.id, profileFor);
+      box.appendChild(el('p', 'mini', 'Scores on this device.'));
       backRow(sheet);
     }
   };
@@ -1043,10 +941,49 @@ import { buildGraphicsSection } from './gfx-panel.js';
     view.domElement.addEventListener('pointercancel', cancel);
   }
 
+  // Keyboard actions by KeyboardEvent.code (control.* in starhermit.txt);
+  // a signed-in player's StarHermit overrides replace these at boot.
+  var KEY_DEFAULTS = {
+    pause: ['KeyP', 'Escape'], pickup: ['KeyK'], hint: ['KeyH'], undo: ['KeyU'], speed: ['KeyF'], camera: ['KeyC']
+  };
+  for (var ti = 1; ti <= 9; ti++) KEY_DEFAULTS['table' + ti] = ['Digit' + ti, 'Numpad' + ti];
+  var keyBindings = JSON.parse(JSON.stringify(KEY_DEFAULTS));
+  function actionForCode(code) {
+    for (var a in keyBindings) if (keyBindings[a].indexOf(code) >= 0) return a;
+    return null;
+  }
+  function keyName(action) {
+    var c = (keyBindings[action] || [])[0] || '';
+    return { Escape: 'Esc', Space: 'Space' }[c] || c.replace(/^Key/, '').replace(/^Digit/, '').replace(/^Numpad/, 'Num ');
+  }
+  function keysText() {
+    return keyName('table1') + '–' + keyName('table9') + ' serve table · ' + keyName('pickup') + ' pick up dishes · ' +
+      keyName('hint') + ' hint · ' + keyName('undo') + ' rewind (practice) · ' + keyName('camera') + ' camera · ' +
+      keyName('speed') + ' fast-forward · ' + keyBindings.pause.map(function (c) { return c === 'Escape' ? 'Esc' : c.replace(/^Key/, ''); }).join('/') + ' pause.';
+  }
+
+  function accountLine() {
+    if (!P.hosted) return signedOutNotice ? ACCOUNT.signedOut : ACCOUNT.offline;
+    var name = P.profile ? P.profile.displayName : '…';
+    var sync = P.sync === 'synced' ? ACCOUNT.synced : P.sync === 'saving' ? ACCOUNT.saving : ACCOUNT.syncOff;
+    return ACCOUNT.playingAs.replace('{name}', name) + ' · ' + sync;
+  }
+  function refreshAccountLine() {
+    var line = document.getElementById('account-line');
+    if (line) line.textContent = accountLine();
+  }
+  function copyInvite() {
+    var link = P.inviteLink();
+    if (!link) return;
+    var fail = function () { showToast(ACCOUNT.inviteFailed + ' ' + link); };
+    try { navigator.clipboard.writeText(link).then(function () { showToast(ACCOUNT.inviteCopied); }, fail); }
+    catch (err) { fail(); }
+  }
+
   document.addEventListener('keydown', function (e) {
     if (e.target && /^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName)) return;
-    var k = e.key.toLowerCase();
-    if (k === 'escape' || k === 'p') {
+    var act = actionForCode(e.code);
+    if (act === 'pause' || e.code === 'Escape') {
       if (screenEl) {
         // Only an active in-round overlay (pause and friends) closes to play;
         // on menu/results screens there is nothing underneath to return to.
@@ -1060,15 +997,15 @@ import { buildGraphicsSection } from './gfx-panel.js';
       return;
     }
     if (!game || game.over || game.paused) return;
-    if (k >= '1' && k <= '9') {
-      var tid = parseInt(k, 10) - 1;
+    if (act && /^table\d$/.test(act)) {
+      var tid = parseInt(act.slice(5), 10) - 1;
       if (tid < game.state.tables.length) dispatch({ type: 'serve', table: tid });
       e.preventDefault();
-    } else if (k === 'k') { dispatch({ type: 'pickup' }); e.preventDefault(); }
-    else if (k === 'h') { if (hudBtns.hint) hudBtns.hint.click(); e.preventDefault(); }
-    else if (k === 'u') { undo(); e.preventDefault(); }
-    else if (k === 'f') { if (hudBtns.speed) hudBtns.speed.click(); e.preventDefault(); }
-    else if (k === 'c') { if (view) view.frameCamera(); e.preventDefault(); }
+    } else if (act === 'pickup') { dispatch({ type: 'pickup' }); e.preventDefault(); }
+    else if (act === 'hint') { if (hudBtns.hint) hudBtns.hint.click(); e.preventDefault(); }
+    else if (act === 'undo') { undo(); e.preventDefault(); }
+    else if (act === 'speed') { if (hudBtns.speed) hudBtns.speed.click(); e.preventDefault(); }
+    else if (act === 'camera') { if (view) view.frameCamera(); e.preventDefault(); }
   });
 
   // gamepad: dpad/left stick navigates legal actions, A commits, B/Start pauses
@@ -1123,9 +1060,26 @@ import { buildGraphicsSection } from './gfx-panel.js';
   // ---------- boot ----------
   buildShell();
   applySettings();
-  initPlatform();
   syncServerTime();
   showScreen('title');
+  // StarHermit: remote save wins over the local copy, platform settings win
+  // over saved preferences; localStorage stays the offline cache.
+  P.init({
+    onProfile: refreshAccountLine,
+    onSync: refreshAccountLine,
+    onAuth: function (a) { if (!a.signedIn) signedOutNotice = true; if (currentScreenName() === 'title') showScreen('title'); }
+  }).then(function (remoteRaw) {
+    refreshAccountLine();
+    if (!P.hosted) return;
+    var remote = remoteRaw ? S.loadRaw(remoteRaw) : null;
+    var ps = P.platformSettings;
+    if (remote) doc = remote;
+    if (ps) Object.keys(S.DEFAULT_SETTINGS).forEach(function (k) { if (k in ps) doc.settings[k] = ps[k]; });
+    settings = doc.settings;
+    persist();
+    applySettings();
+    applyGraphics();
+    return P.loadBindings(KEY_DEFAULTS).then(function (b) { keyBindings = b; });
+  }).then(function () { if (currentScreenName() === 'title') showScreen('title'); });
   rafId = requestAnimationFrame(loop);
-  funnel('app-start');
 })();

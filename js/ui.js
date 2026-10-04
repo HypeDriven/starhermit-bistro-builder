@@ -182,14 +182,14 @@
   }
 
   // ---------- help ----------
-  function buildHelp(container) {
+  function buildHelp(container, keysText) {
     container.innerHTML = '';
     var cards = [
       ['The loop', 'Guests arrive at the door and seat themselves. Stoves cook dishes into the kitchen stock. Carry dishes to waiting tables before patience runs out — served guests pay coins plus a tip for fast service.'],
       ['Serving', 'Tap a table with a waiting guest (or press its number key). If your tray is empty, you grab dishes from the kitchen on the way. Amber patience rings mean hurry.'],
       ['Spending coins', 'Tray upgrades carry more dishes, helper waiters serve on their own, extra stoves cook faster, and expansion opens walled-off tables. Coins spent still count toward the day’s earnings goal.'],
       ['Goal', 'Earn the goal in coins before service ends. Finish early for a time bonus. Guests who leave angry cost score.'],
-      ['Keyboard', '1–9 serve table · K pick up dishes · H hint · U rewind (practice) · C camera · F fast-forward · P/Esc pause. Tab moves through every control; all actions have DOM buttons in the station panel.'],
+      ['Keyboard', (keysText || '1–9 serve table · K pick up dishes · H hint · U rewind (practice) · C camera · F fast-forward · P/Esc pause.') + ' Tab moves through every control; all actions have DOM buttons in the station panel.'],
       ['Fair play', 'Randomness is seeded and shown on the results screen. Ranked modes are the daily challenge and the six challenges.']
     ];
     cards.forEach(function (c) {

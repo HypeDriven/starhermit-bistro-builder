@@ -13,7 +13,7 @@
 | Session | 90 s (Solo Sprint) to 5 min (Marathon); a Journey stage is 2–4 min; a Learn lesson under 1 min |
 | Platforms | Desktop and mobile browsers (portrait and landscape); WebGL optional |
 | Rendering | Three.js r160 (`vendor/three.module.min.js` + same-revision addons under `vendor/three/addons/`, mapped by an importmap) diorama with fully procedural geometry, plus a semantic HTML "station mirror" that is a complete playable text twin of the board |
-| Simulation | Fixed 100 ms tick, seeded, deterministic, replay-validated on the server |
+| Simulation | Fixed 100 ms tick, seeded, deterministic, replay envelope recorded per ranked run |
 
 ### File map
 
@@ -261,11 +261,19 @@ Conventions per https://wiki.starhermit.com/ — packaging via `starhermit.txt` 
 
 **Used**
 - `starhermit.txt`: `name=Bistro Builder`, `launch=index.html`, `owner=<uuid>`, `server=server.js`, `cover=coverart.png`.
-- `server.js` as the game script: serves the distribution (refusing `server.js`, `spec.md`, anything under `data/`, and paths escaping the root), and exposes `GET /api/v1/time` (daily boundary sync with round-trip offset in `main.js#syncServerTime`), `GET /api/v1/scores?cfgId=`, `POST /api/v1/scores` (full deterministic replay through `rules.js`; rejects stale content version, unknown content, seed mismatch, hash or score mismatch; per-IP rate limit 12/min; idempotent per session+content), and `POST /api/v1/events` (anonymous funnel counters: `app-start`, `round-start`, `round-end`, `tutorial-step`, `settings-change`).
-- Structured `{"error":"…"}` responses everywhere; the client treats any failure as "offline" and falls back to the local board.
-- **Launch token** (`main.js#initPlatform`): read from the URL fragment `#game_token=<jwt>` (optional `&session_id=`, stripped after the read; query `?token=`/`?launch_token=` kept for local dev), decoded for `sub` + `game_scope` (never hard-coded), sent as `Authorization: Bearer` on every `/api` call, re-minted every 45 min via `POST /api/v1/games/{slug}/launch-token` (60 s retry on failure). The old self-disable on `<uuid>.starhermit.com` hosts is gone — hosted mode activates iff a token was read. Ranked envelopes carry `playerId` (the account id) so board rows attach to the account; `GET /api/v1/users/{id}/profile` (never `/api/v1/me`, never usernames; `Player <id8>` fallback) resolves row nicknames on the leaderboard screen, the own row is highlighted, and everything still degrades to local boards when the routes 404.
+- `server.js` as the game script: serves the distribution (refusing `server.js`, `spec.md`, anything under `data/`, and paths escaping the root), and exposes `GET /api/v1/time` (daily boundary sync with round-trip offset in `main.js#syncServerTime` — the only route the client calls, and only when signed in; standalone uses the local clock and makes no `/api` or `/ws` request). The remaining routes are kept for the server tests but are not called by the client: `GET /api/v1/scores?cfgId=`, `POST /api/v1/scores` (full deterministic replay through `rules.js`; rejects stale content version, unknown content, seed mismatch, hash or score mismatch; per-IP rate limit 12/min; idempotent per session+content), and `POST /api/v1/events` (anonymous funnel counters: `app-start`, `round-start`, `round-end`, `tutorial-step`, `settings-change`).
+- Structured `{"error":"…"}` responses everywhere. The client keeps its leaderboard on the device (`store.js`) and sends no funnel events.
+- **SDK:** `starhermit-sdk.js` (verbatim copy of the canonical client) and `js/platform.js` (`window.BBPlatform`) load before every other script; the adapter calls `StarHermit.init()` as it loads. Without a token no StarHermit request is made.
+- **Launch token and renewal:** the SDK reads `#game_token=<jwt>[&session_id=]` or a sign-in return `#access_token=…`, strips it, takes the slug from `game_scope` (never hard-coded) and renews via `POST /api/v1/games/{slug}/launch-token`; the current token is also sent as `Authorization: Bearer` on `GET /api/v1/time`. If renewal is refused the title account line reads "Signed out of StarHermit — progress stays on this device." and play continues locally.
+- **Sign-in:** on `*.starhermit.com` without a token the title shows **Sign in with StarHermit** (`StarHermit.signIn()`); hidden when signed in and locally.
+- **Identity:** the title account line shows "Playing as <nickname> · <sync status>" (or the offline line). The leaderboard screen shows the device's local board for today's daily plus the seeded house regulars; `GET /api/v1/users/{id}/profile` (never `/api/v1/me`; `Player <id8>` fallback, no request when signed out) resolves nicknames for rows that carry a player id.
+- **Cloud save:** the whole save document (settings + progress, the checksummed `bistrobuilder.save.v1` wrapper) mirrors to `/api/v1/me/cloud-saves/game:{slug}`. On start the remote copy wins; localStorage stays the offline cache; every save queues a debounced (2 s) upload, flushed on `pagehide`/hidden.
+- **Settings KV:** every save sends the changed `settings` keys (volumes, mute, captions, graphics, theme, reduced motion, contrast, palette, text size, handedness, haptics, board mirror, speed) with `PATCH /api/v1/games/{slug}/settings`; on start the platform's values override the save document's.
+- **Invite:** when signed in the title shows **Invite a friend**, which copies `StarHermit.inviteLink()` and confirms with a toast (the link is shown if the clipboard is blocked).
+- **Controls:** `starhermit.txt` declares 15 `control.*` actions (`table1`–`table9`, `pickup`, `hint`, `undo`, `speed`, `camera`, `pause`); keydown routes by `event.code` through `StarHermit.loadBindings` (defaults standalone) and the Help → Keyboard card lists the effective keys. Escape always pauses/closes.
+- **Strings:** sign-in, invite, toast and account-line texts exist in all nine locales (`ACCOUNT_STRINGS` in `js/gfx-strings.js`).
 
-**Not used:** avatars, presence heartbeats, platform achievements (achievements are local in the save document), cloud saves, launch activity start/end, sessions/rooms, websockets, chat, voice, entitlements.
+**Not used:** StarHermit achievements and leaderboards and the `server.js` score/event routes (achievements and boards stay local in the save document), avatars (no player chip), presence, activity start/end, platform sessions/matchmaking/invites/chat/replays (single-player), websockets, voice, entitlements.
 
 ## 13. Technical architecture
 
@@ -275,11 +283,11 @@ Conventions per https://wiki.starhermit.com/ — packaging via `starhermit.txt` 
 - **Persistence (`store.js`):** `bistrobuilder.save.v1` = `{sum: FNV-1a(payload), payload}` with settings + progress; a bad checksum or a future version yields a fresh document; a memory fallback covers private mode. `bistrobuilder.leaderboards.v1` holds the local board (top 100). Tokens and identity are never stored.
 - **Determinism:** rules stream (`0x9e3779b9`) for the simulation, decor stream (`0x85ebca6b`) for props and rival scores, AV stream (`0xc2b2ae35`) for pitch variants; cosmetic streams never feed rules.
 - **Budgets (by construction, not yet profiled):** one instanced floor draw, four walls, counter, one instanced prop mesh, ≤3 meshes + ring per table, 3 per stove, 3–4 per figure, one shadow-casting light; the Low preset renders directly with no shadow map and no post chain at 0.85× pixel ratio; the mirror DOM is rebuilt per tick (≤ 10 Hz) and is the main CPU cost on low-end phones.
-- **E2E drive:** `tests/e2e.mjs` runs its own static server with `/api/v1` stubs, opens headless Chrome via `playwright-core` (falling back to Playwright's Firefox with software WebGL when Chrome's headless compositor cannot screenshot; `E2E_BROWSER=chrome|firefox` forces one), and plays only through visible UI — it reads the station mirror for state, clicks the mirror's Serve/Pick-up buttons at 1280×800 and presses the documented `1–9`/`K` keys at 390×844 (touch), toggles fast-forward with the real button, and fails on any `pageerror`, console error or console warning.
+- **E2E drive:** `tests/e2e.mjs` runs its own static server (404 for `/api*` and `/ws*`; any such request fails the run), opens headless Chrome via `playwright-core` (falling back to Playwright's Firefox with software WebGL when Chrome's headless compositor cannot screenshot; `E2E_BROWSER=chrome|firefox` forces one), and plays only through visible UI — it reads the station mirror for state, clicks the mirror's Serve/Pick-up buttons at 1280×800 and presses the documented `1–9`/`K` keys at 390×844 (touch), toggles fast-forward with the real button, and fails on any `pageerror`, console error or console warning.
 
 ## 14. Testing and acceptance criteria
 
-`npm test` runs `tests/run-tests.js` (18 tests) and `tests/gfx.test.mjs` (12 tests: `detectPreset` on sample GPU strings and the mobile cap, `resolve` with preset/override/scale clamp, presets clearing overrides, `describe`, Low cost bound, graphics strings for every locale, `settings.gfx` defaults and legacy migration). `run-tests.js` covers: initial state and hash; serve/pickup legality and every invalid reason; payout = price + tip and the total formula; buy caps, funds and mechanics flags; expansion and helper hiring; goal win / day fail / resign terminals and post-terminal rejection; lost-guest penalty; serialize round-trip and version rejection; deterministic replay hash equality; fuzzed malformed commands never hang or produce NaN; every content config passes `validateAll`; 40 stages with mastery every fifth; daily determinism per date; golden bot sessions terminate on easy/medium/hard/challenge/daily; save migration and future-version refusal; leaderboard tie order; achievement key shape; and a live server check (time, static files, `server.js` forbidden, honest envelope accepted, duplicate replaced, inflated score / stale version / unknown content rejected with 422, 404 shape).
+`npm test` runs `tests/run-tests.js` (18 tests), `tests/platform.test.mjs` (StarHermit adapter: no requests standalone; token read and fragment stripped; nickname; settings patch of changed keys; cloud-save round trip through `game:<slug>`; control overrides; sign-out on refused renewal; account strings in all nine locales) and `tests/gfx.test.mjs` (12 tests: `detectPreset` on sample GPU strings and the mobile cap, `resolve` with preset/override/scale clamp, presets clearing overrides, `describe`, Low cost bound, graphics strings for every locale, `settings.gfx` defaults and legacy migration). `run-tests.js` covers: initial state and hash; serve/pickup legality and every invalid reason; payout = price + tip and the total formula; buy caps, funds and mechanics flags; expansion and helper hiring; goal win / day fail / resign terminals and post-terminal rejection; lost-guest penalty; serialize round-trip and version rejection; deterministic replay hash equality; fuzzed malformed commands never hang or produce NaN; every content config passes `validateAll`; 40 stages with mastery every fifth; daily determinism per date; golden bot sessions terminate on easy/medium/hard/challenge/daily; save migration and future-version refusal; leaderboard tie order; achievement key shape; and a live server check (time, static files, `server.js` forbidden, honest envelope accepted, duplicate replaced, inflated score / stale version / unknown content rejected with 422, 404 shape).
 
 `npm run test:e2e` (`tests/e2e.mjs`): title visible → Settings toggles reduced motion on `<body>` and closes → Graphics: Low then High (checks `body[data-gfx-preset]` and the summary), Shadows override Off and Show frame rate on, reload, both survive, back to Auto (overrides cleared) → Help opens/closes → Learn lesson 1 to "Lesson complete!" → Journey grid shows 40 cells with stage 1 unlocked → stage 1 played to a real results headline → progress persisted in localStorage → Play again → Pause freezes the clock → Resume → `U` rewinds and the clock keeps running → Pause → Settings → Ultra, two seconds of play at Ultra, back to Auto → Leave service → resign results → Home. Desktop pass then mobile pass; zero page errors.
 
@@ -288,7 +296,7 @@ Conventions per https://wiki.starhermit.com/ — packaging via `starhermit.txt` 
 - Every feature in this document is reachable by clicking visible UI at 1280×800 and 390×844, and the e2e run passes at both.
 - No console errors or warnings during the e2e run (GPU/SwiftShader notices excepted).
 - No text or control is clipped at either viewport: chips wrap, sheets scroll, toolbar fits.
-- Ranked results cannot be forged: `server.js` reproduces the replay exactly or rejects it.
+- Ranked results submitted to `server.js` cannot be forged: it reproduces the replay exactly or rejects it (the shipped client keeps boards locally and does not submit).
 
 ## 15. Asset inventory
 
@@ -309,9 +317,9 @@ Conventions per https://wiki.starhermit.com/ — packaging via `starhermit.txt` 
 
 ## 16. Known limitations
 
-- Localization: English only (§10), except the Graphics settings section.
+- Localization: English only (§10), except the Graphics settings section and the StarHermit account strings.
 - On software WebGL (llvmpipe) at low resolution, bloom around the tiny festoon bulbs can show faint square halos; hardware GPUs filter the bloom mips smoothly.
-- Presence, cloud save and platform-side achievements/leaderboards are not called; boards are the game's own `server.js` plus a local fallback, and "house regulars" are seeded rivals, not real players.
+- Presence, cloud save and platform-side achievements/leaderboards are not called; boards are local to the device, and "house regulars" are seeded rivals, not real players.
 - The "Rewind" toast says "one second" but the snapshot cadence is one per accepted command; a rewind is "before your last command".
 - Queued guests who have no table drain patience while standing at the door, so an over-full queue can lose guests you never had a chance to serve.
 - Helper waiters share the Frost theme's accent colour (`0x7ec8e8`); under the Frost theme they are less distinct from the door glow.
@@ -323,7 +331,7 @@ Conventions per https://wiki.starhermit.com/ — packaging via `starhermit.txt` 
 ## Design intent not yet implemented
 
 - Full string tables and a language selector for en-US, en-GB, es-419, es-ES, de-DE, fr-FR, fr-CA, pt-BR, it-IT.
-- Presence heartbeats, cloud-saved progress, and platform achievement/leaderboard endpoints per the StarHermit wiki, with friends filtering (launch-token identity and board nickname display are done; boards remain served by the game's own `server.js`).
+- Presence heartbeats, cloud-saved progress, and platform achievement/leaderboard endpoints per the StarHermit wiki, with friends filtering (launch-token identity and board nickname display are done; boards are device-local).
 - A per-second undo snapshot cadence to match the "Rewound one second" wording, or reword the toast.
 - Item-specific synth/clip cues for tray and stove purchases (currently the generic cash register).
 - Voice-bus content (a short greeter line on service start) and haptic pulses on `urgent` and `serve` on devices that support them.

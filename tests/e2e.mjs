@@ -10,8 +10,8 @@
  *
  * The repo's server.js is the StarHermit authoritative host (score replay
  * validation) — NOT a dev server — so this file embeds its own minimal
- * static server on an ephemeral port, with tiny /api/v1 stubs so the game's
- * offline-capable API calls resolve without console noise.
+ * static server on an ephemeral port. It 404s /api and /ws and fails the run
+ * if a standalone load requests either.
  *
  * State synchronization reads the semantic station-mirror DOM (the text
  * version of the 3D board); every action goes through real UI interaction.
@@ -43,15 +43,15 @@ const MIME = {
   '.woff2': 'font/woff2', '.ts': 'text/typescript', '.txt': 'text/plain; charset=utf-8',
 };
 
+const ownServerHits = [];
 const server = http.createServer(async (req, res) => {
   try {
     const url = new URL(req.url, 'http://localhost');
-    // Minimal /api/v1 stubs (the game falls back to local boards offline).
-    if (url.pathname.startsWith('/api/v1/')) {
-      res.setHeader('Content-Type', 'application/json');
-      if (url.pathname === '/api/v1/time') return res.end(JSON.stringify({ now: Date.now() }));
-      if (url.pathname === '/api/v1/scores' && req.method === 'GET') return res.end(JSON.stringify({ entries: [] }));
-      return res.end(JSON.stringify({ ok: true }));
+    // Plain static host: a standalone load must never call own-server routes.
+    if (url.pathname.startsWith('/api') || url.pathname.startsWith('/ws')) {
+      ownServerHits.push(req.method + ' ' + url.pathname);
+      res.statusCode = 404;
+      return res.end();
     }
     let p = normalize(decodeURIComponent(url.pathname)).replace(/^(\.\.[/\\])+/, '');
     if (p === '/' || p === '\\') p = '/index.html';
@@ -333,6 +333,7 @@ async function runPass(browser, pass, viewport, hasTouch) {
       await page.waitForSelector('.screen[aria-label="title"]');
     });
   } finally {
+    if (ownServerHits.length) errors.push('own-server requests while standalone: ' + ownServerHits.join(', '));
     if (errors.length) {
       console.log(`PAGE ERRORS [${pass}]:\n` + errors.join('\n'));
       throw new Error(`${errors.length} page error(s) in ${pass} pass`);
