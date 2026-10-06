@@ -129,12 +129,24 @@ import { accountStrings } from './gfx-strings.js';
   function announce(text) { liveRegion.textContent = text; }
   var toastTimer = null;
   function showToast(text, invalid) {
+    // While a screen (title, pause, results…) is open the toast floats above it from #app;
+    // inside the playfield it would sit under the screen's dark overlay.
+    var over = !!screenEl;
+    var host = over ? app : playfield;
+    if (toast.parentNode !== host) host.appendChild(toast);
     toast.textContent = text;
-    toast.className = 'toast' + (invalid ? ' invalid' : '');
+    toast.className = 'toast' + (invalid ? ' invalid' : '') + (over ? ' over-screen' : '');
     toast.style.display = '';
+    syncToastH();
     clearTimeout(toastTimer);
-    toastTimer = setTimeout(function () { toast.style.display = 'none'; }, 2600);
+    toastTimer = setTimeout(function () { toast.style.display = 'none'; syncToastH(); }, 2600);
     if (invalid) announce('Not allowed: ' + text);
+  }
+  // Screens pad their bottom by the floating toast's height (layout px; both are zoomed alike)
+  // so their last buttons can always be scrolled clear of it.
+  function syncToastH() {
+    var on = toast.style.display !== 'none' && toast.classList.contains('over-screen');
+    app.style.setProperty('--toast-h', on ? (toast.offsetHeight + 12) + 'px' : '0px');
   }
   function showBanner(text, ms) {
     banner.textContent = text; banner.style.display = '';
