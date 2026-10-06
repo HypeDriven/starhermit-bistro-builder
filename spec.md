@@ -167,7 +167,8 @@ Every screen is a `.screen[role=dialog][aria-label=<name>]` sheet (max 720 px) o
 - ≥1024 px: header bar (title, Coins/Earned/Clock/Served chips, ☰), 240 px left rail (objective, progress bar, hint, lesson step), central playfield with the bottom toolbar, 260 px right rail (station mirror, upgrade grid). Left-handed swaps the rails.
 - <1024 px: rails become slide-in drawers (📋 and 🍽 header buttons); "Always show station panel" docks the right rail permanently.
 - Portrait ≤700 px: toolbar buttons stretch to 30 % width in the bottom thumb zone; screens tighten padding.
-- Landscape ≤500 px tall: compressed header and chips, 44 px toolbar minimum.
+- Landscape ≤500 px tall: compressed header and chips, 44 px toolbar minimum; the title drops its key art and compacts the hero so the whole menu fits without scrolling.
+- Every screen opens at its top: the first control is focused without scrolling the sheet.
 - Large screens (above 1600×1000): `ui-scale.js` sets `--ui-scale` (1 up to a 1600×1000 viewport, then the smaller of width/1600 and height/1000, capped at 2.5) and the header, rails, screens, action tray, banner, toast, caption line and frame-rate meter are CSS-`zoom`ed by it (vw/vh lengths inside are divided by it); the playfield canvas is not zoomed and fills the space the larger chrome leaves.
 - Toasts sit bottom-centre of the playfield during play (one line up to 90% wide, then wrapping); while a screen (title, pause, results…) is open the toast floats above it, fixed to the viewport bottom, and the screen pads its bottom by the toast height so its last buttons can be scrolled clear.
 - Safe areas: `env(safe-area-inset-*)` pad the header, screens, toolbar, toast and caption line. Nothing critical sits under the bottom inset; the toolbar is the lowest interactive element and is inset-aware.

@@ -593,7 +593,9 @@ import { accountStrings } from './gfx-strings.js';
     buildFn(sheet);
     app.appendChild(screenEl);
     var first = sheet.querySelector('button, [href], input, select');
-    if (first) first.focus();
+    // Open at the top (heading visible) even when the first control is below the fold.
+    if (first) first.focus({ preventScroll: true });
+    screenEl.scrollTop = 0;
   }
   function backRow(sheet, label, fn) {
     var row = el('div', 'row');

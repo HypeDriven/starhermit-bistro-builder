@@ -293,6 +293,11 @@ button, select, input { font: inherit; color: inherit; }
   }
   .hud-actions .btn { min-height: 44px; font-size: .9em; }
   .screen .row { margin-top: .5em; }
+  /* the title menu fits a phone in landscape without scrolling: no key art, compact hero */
+  .title-hero { padding: .2em 0 .3em; }
+  .title-hero .key-art { display: none; }
+  .title-hero .logo { font-size: 2em; }
+  .title-hero p { font-size: .85em; margin: .2em auto; }
 }
 
 body.reduced-motion * { transition-duration: .01ms !important; animation-duration: .01ms !important; }
