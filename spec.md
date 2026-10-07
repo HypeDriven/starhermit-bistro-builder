@@ -33,7 +33,8 @@
 | `vendor/three/addons/` | three r160 addons: EffectComposer, RenderPass, ShaderPass, OutputPass, GTAOPass, UnrealBloomPass, SMAAPass, FXAAShader, RoomEnvironment and their imports |
 | `js/main.js` | Bootstrap, screen state machine, fixed-step loop, command dispatch + replay envelope, undo, lessons, HUD, input, persistence, host API |
 | `css/game.css` | Layout tokens, rails/drawers, HUD, screens, responsive and accessibility modes |
-| `server.js` | StarHermit `server=` script: static host + `/api/v1/{time,scores,events}` with deterministic replay validation |
+| `score-script.js` | StarHermit platform script (`server=`): range-checks a finished run's total sent through `StarHermit.submitScores` and posts it to the `high-score` leaderboard (canonical copy in the games repo's `tools/score-script.js`) |
+| `server.js` | Local dev server: static host + `/api/v1/{time,scores,events}` with deterministic replay validation |
 | `data/scores.json` | Server-side leaderboard store (never served) |
 | `sfx/*.opus`, `sfx/manifest.txt` | 20 authored clips and the canonical event binding table (`manifest.json` feeds the generator, `manifest.md` is generated) |
 | `assets/key-art.webp`, `assets/results-win.webp`, `assets/results-lose.webp` | Title key art and results illustrations |
@@ -263,8 +264,9 @@ English only ships, except the Graphics settings section: its strings live in `j
 Conventions per https://wiki.starhermit.com/ — packaging via `starhermit.txt` and an optional authoritative script.
 
 **Used**
-- `starhermit.txt`: `name=Bistro Builder`, `launch=index.html`, `owner=<uuid>`, `server=server.js`, `cover=coverart.png`.
-- `server.js` as the game script: serves the distribution (refusing `server.js`, `spec.md`, anything under `data/`, and paths escaping the root), and exposes `GET /api/v1/time` (daily boundary sync with round-trip offset in `main.js#syncServerTime` — the only route the client calls, and only when signed in; standalone uses the local clock and makes no `/api` or `/ws` request). The remaining routes are kept for the server tests but are not called by the client: `GET /api/v1/scores?cfgId=`, `POST /api/v1/scores` (full deterministic replay through `rules.js`; rejects stale content version, unknown content, seed mismatch, hash or score mismatch; per-IP rate limit 12/min; idempotent per session+content), and `POST /api/v1/events` (anonymous funnel counters: `app-start`, `round-start`, `round-end`, `tutorial-step`, `settings-change`).
+- `starhermit.txt`: `name=Bistro Builder`, `launch=index.html`, `owner=<uuid>`, `server=score-script.js`, `cover=coverart.png`.
+- **Leaderboard:** when signed in, every finished run except lessons posts its final score total through `StarHermit.submitScores` (a practice session whose `score-script.js` posts it to the `high-score` board: integer, higher is better, 0–1,000,000; negative totals are rejected), and the results screen shows "Leaderboard rank: #N" (or posted / not posted). Standalone play posts nothing and shows no line.
+- `server.js` as the local dev server: serves the distribution (refusing `server.js`, `spec.md`, anything under `data/`, and paths escaping the root), and exposes `GET /api/v1/time` (daily boundary sync with round-trip offset in `main.js#syncServerTime` — the only route the client calls, and only when signed in; standalone uses the local clock and makes no `/api` or `/ws` request). The remaining routes are kept for the server tests but are not called by the client: `GET /api/v1/scores?cfgId=`, `POST /api/v1/scores` (full deterministic replay through `rules.js`; rejects stale content version, unknown content, seed mismatch, hash or score mismatch; per-IP rate limit 12/min; idempotent per session+content), and `POST /api/v1/events` (anonymous funnel counters: `app-start`, `round-start`, `round-end`, `tutorial-step`, `settings-change`).
 - Structured `{"error":"…"}` responses everywhere. The client keeps its leaderboard on the device (`store.js`) and sends no funnel events.
 - **SDK:** `starhermit-sdk.js` (verbatim copy of the canonical client) and `js/platform.js` (`window.BBPlatform`) load before every other script; the adapter calls `StarHermit.init()` as it loads. Without a token no StarHermit request is made.
 - **Launch token and renewal:** the SDK reads `#game_token=<jwt>[&session_id=]` or a sign-in return `#access_token=…`, strips it, takes the slug from `game_scope` (never hard-coded) and renews via `POST /api/v1/games/{slug}/launch-token`; the current token is also sent as `Authorization: Bearer` on `GET /api/v1/time`. If renewal is refused the title account line reads "Signed out of StarHermit — progress stays on this device." and play continues locally.
@@ -274,9 +276,9 @@ Conventions per https://wiki.starhermit.com/ — packaging via `starhermit.txt` 
 - **Settings KV:** every save sends the changed `settings` keys (volumes, mute, captions, graphics, theme, reduced motion, contrast, palette, text size, handedness, haptics, board mirror, speed) with `PATCH /api/v1/games/{slug}/settings`; on start the platform's values override the save document's.
 - **Invite:** when signed in the title shows **Invite a friend**, which copies `StarHermit.inviteLink()` and confirms with a toast (the link is shown if the clipboard is blocked).
 - **Controls:** `starhermit.txt` declares 15 `control.*` actions (`table1`–`table9`, `pickup`, `hint`, `undo`, `speed`, `camera`, `pause`); keydown routes by `event.code` through `StarHermit.loadBindings` (defaults standalone) and the Help → Keyboard card lists the effective keys. Escape always pauses/closes.
-- **Strings:** sign-in, invite, toast and account-line texts exist in all nine locales (`ACCOUNT_STRINGS` in `js/gfx-strings.js`).
+- **Strings:** sign-in, invite, toast and account-line texts and the results-screen leaderboard line exist in all nine locales (`ACCOUNT_STRINGS` in `js/gfx-strings.js`).
 
-**Not used:** StarHermit achievements and leaderboards and the `server.js` score/event routes (achievements and boards stay local in the save document), avatars (no player chip), presence, activity start/end, platform sessions/matchmaking/invites/chat/replays (single-player), websockets, voice, entitlements.
+**Not used:** StarHermit achievements and the `server.js` score/event routes (achievements and the per-config score comparison stay local in the save document), avatars (no player chip), presence, activity start/end, platform sessions/matchmaking/invites/chat/replays (single-player), websockets, voice, entitlements.
 
 ## 13. Technical architecture
 
@@ -322,7 +324,7 @@ Conventions per https://wiki.starhermit.com/ — packaging via `starhermit.txt` 
 
 - Localization: English only (§10), except the Graphics settings section and the StarHermit account strings.
 - On software WebGL (llvmpipe) at low resolution, bloom around the tiny festoon bulbs can show faint square halos; hardware GPUs filter the bloom mips smoothly.
-- Presence, cloud save and platform-side achievements/leaderboards are not called; boards are local to the device, and "house regulars" are seeded rivals, not real players.
+- Presence and platform-side achievements are not called; the per-config score comparison is local to the device, and "house regulars" are seeded rivals, not real players.
 - The "Rewind" toast says "one second" but the snapshot cadence is one per accepted command; a rewind is "before your last command".
 - Queued guests who have no table drain patience while standing at the door, so an over-full queue can lose guests you never had a chance to serve.
 - Helper waiters share the Frost theme's accent colour (`0x7ec8e8`); under the Frost theme they are less distinct from the door glow.
@@ -334,7 +336,7 @@ Conventions per https://wiki.starhermit.com/ — packaging via `starhermit.txt` 
 ## Design intent not yet implemented
 
 - Full string tables and a language selector for en-US, en-GB, es-419, es-ES, de-DE, fr-FR, fr-CA, pt-BR, it-IT.
-- Presence heartbeats, cloud-saved progress, and platform achievement/leaderboard endpoints per the StarHermit wiki, with friends filtering (launch-token identity and board nickname display are done; boards are device-local).
+- Presence heartbeats, cloud-saved progress, and platform achievement endpoints per the StarHermit wiki, and per-config platform boards with friends filtering (launch-token identity, the global `high-score` board and board nickname display are done; per-config boards are device-local).
 - A per-second undo snapshot cadence to match the "Rewound one second" wording, or reword the toast.
 - Item-specific synth/clip cues for tray and stove purchases (currently the generic cash register).
 - Voice-bus content (a short greeter line on service start) and haptic pulses on `urgent` and `serve` on devices that support them.

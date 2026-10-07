@@ -892,6 +892,15 @@ import { accountStrings } from './gfx-strings.js';
         }).join(', '));
         sheet.appendChild(ua);
       }
+      if (mode !== 'learn' && P.hosted) { // StarHermit high-score board
+        var lbLine = el('p', 'mini lb-line', ACCOUNT.lbPosting);
+        lbLine.setAttribute('aria-live', 'polite');
+        sheet.appendChild(lbLine);
+        P.submitScore(t.score.total).then(function (r) {
+          lbLine.textContent = !r.posted ? ACCOUNT.lbNotPosted
+            : r.rank ? ACCOUNT.lbRank.replace('{rank}', r.rank) : ACCOUNT.lbPosted;
+        });
+      }
       if (cfg.ranked) {
         var lb = el('div');
         sheet.appendChild(lb);
