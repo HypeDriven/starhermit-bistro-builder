@@ -909,9 +909,9 @@ function api(container, callbacks) {
     const k = postKeyFor(w, h);
     if (k !== postKey) { postKey = k; buildPost(w, h); }
     if (composer) {
-      try { composer.render(dt); }
-      catch (e) { postFailed = true; disposeComposer(composer); composer = null; postKey = null; renderer.render(scene, camera); }
-    } else renderer.render(scene, camera);
+      try { (globalThis.GameOptions ? globalThis.GameOptions.draw(composer.renderer, () => composer.render(dt)) : composer.render(dt)); }
+      catch (e) { postFailed = true; disposeComposer(composer); composer = null; postKey = null; (globalThis.GameOptions ? globalThis.GameOptions.draw(renderer, () => renderer.render(scene, camera)) : renderer.render(scene, camera)); }
+    } else (globalThis.GameOptions ? globalThis.GameOptions.draw(renderer, () => renderer.render(scene, camera)) : renderer.render(scene, camera));
     dirty = false;
   }
 
