@@ -14,7 +14,18 @@ import { accountStrings } from './gfx-strings.js';
 
   var R = window.BBRules, C = window.BBContent, S = window.BBStore,
       U = window.BBUI, A = window.BBAudio, RNG = window.BBRNG, P = window.BBPlatform;
-  var ACCOUNT = accountStrings(navigator.language);
+  // Localized strings (js/i18n.js); the account lines follow the same language.
+  var I18N = window.BBI18n;
+  function t(key, vars, fallback) { return I18N ? I18N.t(key, vars, fallback) : (fallback != null ? fallback : key); }
+  function curLang() { return I18N ? I18N.lang : 'en-US'; }
+  var ACCOUNT = accountStrings(curLang());
+  // Hint text from the rules engine's structured hint (key + values).
+  function hintText(h) {
+    if (!h) return '';
+    var v = h.vars || {};
+    if (h.key === 'hint.upgrade') v = { item: U.buyLabel(v.item), n: v.n };
+    return h.key ? t(h.key, v, h.text) : h.text;
+  }
 
   var BUILD = '1.0.0';
   var el = U.el;
@@ -63,7 +74,7 @@ import { accountStrings } from './gfx-strings.js';
 
     topbar = el('header', 'topbar');
     var h1 = el('h1', null, 'Bistro Builder');
-    h1.appendChild(el('span', 'sub', 'miniature service'));
+    h1.appendChild(i18nEl(el('span', 'sub'), 'shell.sub'));
     topbar.appendChild(h1);
     ['coins', 'earned', 'clock', 'served'].forEach(function (k) {
       chips[k] = el('span', 'stat-chip', '—');
@@ -71,27 +82,27 @@ import { accountStrings } from './gfx-strings.js';
     });
     topbar.appendChild(el('span', 'spacer'));
     var btnLeft = el('button', 'btn icon drawer-btn', '📋');
-    btnLeft.type = 'button'; btnLeft.setAttribute('aria-label', 'Toggle objective panel');
+    btnLeft.type = 'button'; i18nAria(btnLeft, 'aria.objectivePanel');
     btnLeft.addEventListener('click', function () { railLeft.classList.toggle('open'); railRight.classList.remove('open'); });
     var btnRight = el('button', 'btn icon drawer-btn', '🍽');
-    btnRight.type = 'button'; btnRight.setAttribute('aria-label', 'Toggle stations panel');
+    btnRight.type = 'button'; i18nAria(btnRight, 'aria.stationsPanel');
     btnRight.addEventListener('click', function () { railRight.classList.toggle('open'); railLeft.classList.remove('open'); });
     topbar.appendChild(btnLeft); topbar.appendChild(btnRight);
     var btnMenu = el('button', 'btn icon', '☰');
-    btnMenu.type = 'button'; btnMenu.setAttribute('aria-label', 'Menu');
+    btnMenu.type = 'button'; i18nAria(btnMenu, 'aria.menu');
     btnMenu.addEventListener('click', function () { if (game && !game.over) pauseGame(true); else showScreen('title'); });
     topbar.appendChild(btnMenu);
     app.appendChild(topbar);
 
     var stage = el('main', 'stage');
     railLeft = el('aside', 'rail left');
-    railLeft.setAttribute('aria-label', 'Objective and progress');
-    railLeft.appendChild(el('h2', null, 'Objective'));
+    i18nAria(railLeft, 'aria.objectiveRail');
+    railLeft.appendChild(i18nEl(el('h2'), 'rail.objective'));
     objectiveBox = el('div', 'objective');
     railLeft.appendChild(objectiveBox);
     var pb = el('div', 'progress-bar'); progressFill = el('div'); pb.appendChild(progressFill);
     railLeft.appendChild(pb);
-    railLeft.appendChild(el('h2', null, 'Hint'));
+    railLeft.appendChild(i18nEl(el('h2'), 'rail.hint'));
     hintLine = el('div', 'hint-line');
     railLeft.appendChild(hintLine);
     lessonStepBox = el('div');
@@ -99,15 +110,15 @@ import { accountStrings } from './gfx-strings.js';
     stage.appendChild(railLeft);
 
     playfield = el('section', 'playfield');
-    playfield.setAttribute('aria-label', 'Bistro playfield. Use the stations panel for a text version of the board.');
+    i18nAria(playfield, 'aria.playfield');
     stage.appendChild(playfield);
 
     railRight = el('aside', 'rail right');
-    railRight.setAttribute('aria-label', 'Stations and upgrades');
-    railRight.appendChild(el('h2', null, 'Stations'));
+    i18nAria(railRight, 'aria.stationsRail');
+    railRight.appendChild(i18nEl(el('h2'), 'rail.stations'));
     mirrorBox = el('div');
     railRight.appendChild(mirrorBox);
-    railRight.appendChild(el('h2', null, 'Upgrades'));
+    railRight.appendChild(i18nEl(el('h2'), 'rail.upgrades'));
     upgradeBox = el('div', 'upgrade-panel');
     railRight.appendChild(upgradeBox);
     stage.appendChild(railRight);
@@ -115,7 +126,7 @@ import { accountStrings } from './gfx-strings.js';
 
     hudActions = el('div', 'hud-actions');
     hudActions.setAttribute('role', 'toolbar');
-    hudActions.setAttribute('aria-label', 'Service actions');
+    i18nAria(hudActions, 'aria.hud');
     playfield.appendChild(hudActions);
 
     banner = el('div', 'banner'); banner.style.display = 'none'; playfield.appendChild(banner);
@@ -125,6 +136,10 @@ import { accountStrings } from './gfx-strings.js';
     liveRegion.setAttribute('aria-live', 'polite');
     app.appendChild(liveRegion);
   }
+
+  // Static shell text carries data-i18n / data-i18n-aria and is re-applied on a language change.
+  function i18nEl(node, key) { node.textContent = t(key); node.setAttribute('data-i18n', key); return node; }
+  function i18nAria(node, key) { node.setAttribute('aria-label', t(key)); node.setAttribute('data-i18n-aria', key); return node; }
 
   function announce(text) { liveRegion.textContent = text; }
   var toastTimer = null;
@@ -140,7 +155,7 @@ import { accountStrings } from './gfx-strings.js';
     syncToastH();
     clearTimeout(toastTimer);
     toastTimer = setTimeout(function () { toast.style.display = 'none'; syncToastH(); }, 2600);
-    if (invalid) announce('Not allowed: ' + text);
+    if (invalid) announce(t('invalid.announce', { text: text }));
   }
   // Screens pad their bottom by the floating toast's height (layout px; both are zoomed alike)
   // so their last buttons can always be scrolled clear of it.
@@ -163,8 +178,7 @@ import { accountStrings } from './gfx-strings.js';
       onCanvas: function (c) { c.addEventListener('pointerdown', onPointerDown); }
     });
     if (!view) {
-      var fb = el('div', 'canvas-fallback',
-        '3D graphics are unavailable in this browser. The station panel on the right is a full text version of the bistro — the game remains playable. Your progress is saved.');
+      var fb = i18nEl(el('div', 'canvas-fallback'), 'canvas.fallback');
       playfield.appendChild(fb);
       return false;
     }
@@ -234,7 +248,7 @@ import { accountStrings } from './gfx-strings.js';
     A.start();
     A.applySettings(settings);
     A.setCaptions(!!settings.captions, function (text) {
-      captionLine.textContent = '♪ ' + text; captionLine.style.display = '';
+      captionLine.textContent = '♪ ' + (CAPTION_KEYS[text] ? t(CAPTION_KEYS[text]) : text); captionLine.style.display = '';
       clearTimeout(captionLine._t);
       captionLine._t = setTimeout(function () { captionLine.style.display = 'none'; }, 1800);
     });
@@ -244,9 +258,9 @@ import { accountStrings } from './gfx-strings.js';
     }
     buildHudActions();
     updateHud();
-    countdownThen('Service begins!', function () {});
+    countdownThen(t('banner.start'), function () {});
     if (lesson) renderLessonStep();
-    announce(cfg.name + '. Goal: ' + (cfg.goal > 0 ? cfg.goal + ' coins' : 'serve guests') + '.');
+    announce(t('an.start', { name: U.cfgName(cfg), goal: cfg.goal > 0 ? t('an.goalCoins', { n: cfg.goal }) : t('an.goalServe') }));
   }
 
   function countdownThen(text, done) {
@@ -290,17 +304,15 @@ import { accountStrings } from './gfx-strings.js';
     return res;
   }
 
-  function invalidText(reason) {
-    var map = {
-      'game-ended': 'service has ended', 'unknown-command': 'unknown action',
-      'malformed-command': 'malformed action', 'bad-table': 'no such table',
-      'table-not-open': 'that table is still walled off', 'no-waiting-guest': 'no guest is waiting there',
-      'no-dishes-available': 'no dishes ready — wait for the kitchen', 'mechanic-not-available': 'not available in this mode',
-      'cap-reached': 'already at maximum', 'insufficient-coins': 'not enough coins yet',
-      'tile-not-walkable': 'you can’t walk there', 'not-active': 'service is paused'
-    };
-    return map[reason] || String(reason);
-  }
+  function invalidText(reason) { return t('inv.' + reason, null, String(reason)); }
+
+  // audio.js emits English caption ids; the caption line shows them in the game language.
+  var CAPTION_KEYS = {
+    'order noted': 'cap.cmd', 'guest arrives': 'cap.spawn', 'dish ready': 'cap.dish-ready', 'dishes picked up': 'cap.pickup',
+    'guest served': 'cap.serve', 'guest left angry': 'cap.leave-angry', 'upgrade bought': 'cap.buy', 'not allowed': 'cap.invalid',
+    'day complete': 'cap.win', 'goal missed': 'cap.lose', 'rewind': 'cap.undo', 'hint': 'cap.hint', 'service begins': 'cap.service-start',
+    'wall knocked down': 'cap.expand', 'guest losing patience': 'cap.urgent', 'helper hired': 'cap.hire'
+  };
 
   // Undo (practice/learn only, where rules permit): one snapshot per second.
   function pushUndo() {
@@ -310,7 +322,7 @@ import { accountStrings } from './gfx-strings.js';
   }
   function undo() {
     if (!game || !game.cfg.mechanics.undo || !game.undoStack.length) {
-      if (game) showToast(game.cfg.mechanics.undo ? 'Nothing to rewind yet.' : 'Rewind is not available here.', true);
+      if (game) showToast(t(game.cfg.mechanics.undo ? 'undo.none' : 'undo.na'), true);
       return;
     }
     var json = game.undoStack.pop();
@@ -321,22 +333,23 @@ import { accountStrings } from './gfx-strings.js';
     // check would reject every sync — rebuild the scene from the snapshot.
     if (view) view.build(game.state, C.THEMES[settings.theme] || C.THEMES.ember, game.cfg.seed, settings);
     A.play('undo');
-    showToast('Rewound one second.');
+    showToast(t('undo.done'));
     updateHud();
   }
 
   // ---------- lessons ----------
   function lessonIndex() { return game && game.lesson ? game.lesson._step || 0 : 0; }
-  function renderLessonStep() {
+  function renderLessonStep(quiet) {
     lessonStepBox.innerHTML = '';
     if (!game || !game.lesson) return;
     var step = game.lesson.steps[lessonIndex()];
     if (!step) return;
     var d = el('div', 'lesson-step');
-    d.appendChild(el('strong', null, 'Lesson: ' + game.lesson.title + ' — '));
-    d.appendChild(document.createTextNode(step.text));
+    var stepText = t('ls.' + game.lesson.id + '.' + lessonIndex(), null, step.text);
+    d.appendChild(el('strong', null, t('lesson.prefix', { title: t('l.' + game.lesson.id, null, game.lesson.title) })));
+    d.appendChild(document.createTextNode(stepText));
     lessonStepBox.appendChild(d);
-    announce('Lesson step: ' + step.text);
+    if (!quiet) announce(t('an.lessonStep', { text: stepText }));
   }
   function checkLessonEvent(cmd) {
     if (!game || !game.lesson) return;
@@ -353,7 +366,7 @@ import { accountStrings } from './gfx-strings.js';
     game.lesson._step = lessonIndex() + 1;
     A.play('dish-ready');
     if (game.lesson._step >= game.lesson.steps.length) {
-      showBanner('Lesson complete!');
+      showBanner(t('banner.lessonDone'));
       doc.progress.tutorialDone[game.lesson.id] = true;
       persist();
       setTimeout(function () { if (game && game.lesson) endGame('lesson-complete'); }, 900);
@@ -401,7 +414,7 @@ import { accountStrings } from './gfx-strings.js';
       if (g.patience <= g.maxPatience * 0.3) {
         game.urgentSeen[g.id] = true;
         A.play('urgent');
-        announce('Table ' + (g.tableId + 1) + ' is about to walk out.');
+        announce(t('an.urgent', { n: g.tableId + 1 }));
       }
     }
   }
@@ -421,8 +434,8 @@ import { accountStrings } from './gfx-strings.js';
         if (e.t === 'serve' && game.lesson._pendingServe) { game.lesson._pendingServe = false; advanceLesson(); }
         if (e.t === 'pickup' && game.lesson._pendingPickup) { game.lesson._pendingPickup = false; advanceLesson(); }
       }
-      if (e.t === 'serve') announce('Guest served for ' + e.pay + ' coins.');
-      if (e.t === 'leave-angry') announce('A guest left angry.');
+      if (e.t === 'serve') announce(t('an.served', { n: e.pay }));
+      if (e.t === 'leave-angry') announce(t('an.angry'));
     }
     evs.length = 0;
   }
@@ -441,41 +454,41 @@ import { accountStrings } from './gfx-strings.js';
       hudBtns[key] = b;
       return b;
     }
-    add('🍽 Pick up', 'pickup', function () { dispatch({ type: 'pickup' }); }, 'Pick up dishes from the kitchen');
-    add('💡 Hint', 'hint', function () {
+    add(t('hud.pickup'), 'pickup', function () { dispatch({ type: 'pickup' }); }, t('hud.pickupAria'));
+    add(t('hud.hint'), 'hint', function () {
       if (!game) return;
       var h = R.hint(game.state);
-      showToast(h.text);
+      showToast(hintText(h));
       A.play('hint');
       if (view && h.action && h.action.type === 'serve') view.setHighlights(['table:' + h.action.table]);
-    }, 'Show a hint');
-    if (game.cfg.mechanics.undo) add('⏪ Rewind', 'undo', undo, 'Rewind one second');
-    add('⏩ Speed', 'speed', function () {
+    }, t('hud.hintAria'));
+    if (game.cfg.mechanics.undo) add(t('hud.rewind'), 'undo', undo, t('hud.rewindAria'));
+    add(t('hud.speed'), 'speed', function () {
       if (!game) return;
       game.speed = game.speed === 1 ? 2 : 1;
-      showToast('Speed ' + game.speed + '× — the end state is identical.');
-    }, 'Toggle fast-forward');
-    add('⏸ Pause', 'pause', function () { pauseGame(true); }, 'Pause');
+      showToast(t('toast.speed', { n: game.speed }));
+    }, t('hud.speedAria'));
+    add(t('hud.pause'), 'pause', function () { pauseGame(true); }, t('hud.pauseAria'));
   }
 
   function updateHud() {
     if (!game) return;
     var st = game.state, cfg = game.cfg;
-    chips.coins.innerHTML = 'Coins <strong>' + st.coins + '</strong>';
-    chips.earned.innerHTML = 'Earned <strong>' + st.earned + '</strong>' + (cfg.goal > 0 ? '/' + cfg.goal : '');
+    chips.coins.innerHTML = esc(t('chip.coins')) + ' <strong>' + st.coins + '</strong>';
+    chips.earned.innerHTML = esc(t('chip.earned')) + ' <strong>' + st.earned + '</strong>' + (cfg.goal > 0 ? '/' + cfg.goal : '');
     chips.earned.classList.toggle('goal-met', cfg.goal > 0 && st.earned >= cfg.goal);
     var remain = Math.max(0, (st.dayTicks - st.tick) * R.TICK_MS);
     chips.clock.textContent = '⏱ ' + U.fmtClock(remain);
     chips.clock.classList.toggle('low', remain < 30000);
-    chips.served.innerHTML = 'Served <strong>' + st.score.served + '</strong>';
+    chips.served.innerHTML = esc(t('chip.served')) + ' <strong>' + st.score.served + '</strong>';
 
     objectiveBox.innerHTML = '';
-    objectiveBox.appendChild(el('div', 'big', cfg.goal > 0 ? st.earned + ' / ' + cfg.goal + ' coins' : st.earned + ' coins earned'));
-    objectiveBox.appendChild(el('div', 'mini', cfg.name + ' · seed ' + (cfg.seed >>> 0).toString(36)));
+    objectiveBox.appendChild(el('div', 'big', cfg.goal > 0 ? t('obj.goal', { earned: st.earned, goal: cfg.goal }) : t('obj.earned', { n: st.earned })));
+    objectiveBox.appendChild(el('div', 'mini', t('obj.seed', { name: U.cfgName(cfg), seed: (cfg.seed >>> 0).toString(36) })));
     progressFill.style.width = cfg.goal > 0 ? Math.min(100, (st.earned / cfg.goal) * 100) + '%' : '0%';
 
     var h = R.hint(st);
-    hintLine.textContent = h.text;
+    hintLine.textContent = hintText(h);
 
     U.updateStationsMirror(mirrorBox, st, { onAction: dispatch });
     U.updateUpgradePanel(upgradeBox, st, R.buyInfo, { onAction: dispatch });
@@ -599,7 +612,7 @@ import { accountStrings } from './gfx-strings.js';
   }
   function backRow(sheet, label, fn) {
     var row = el('div', 'row');
-    var b = el('button', 'btn', label || '← Back');
+    var b = el('button', 'btn', label || t('back'));
     b.type = 'button';
     b.addEventListener('click', fn || function () { showScreen('title'); });
     row.appendChild(b);
@@ -608,7 +621,7 @@ import { accountStrings } from './gfx-strings.js';
   // Settings/help reached from the pause menu must return to the pause menu,
   // not to the title screen (which would strand the paused round behind it).
   function backToContext(sheet) {
-    if (game && !game.over) backRow(sheet, '← Back', function () { pauseGame(true); });
+    if (game && !game.over) backRow(sheet, t('back'), function () { pauseGame(true); });
     else backRow(sheet);
   }
 
@@ -620,19 +633,19 @@ import { accountStrings } from './gfx-strings.js';
       art.addEventListener('error', function () { art.remove(); }); // missing art never breaks the title
       hero.appendChild(art);
       hero.appendChild(el('h2', 'logo', 'Bistro Builder'));
-      hero.appendChild(el('p', null, 'Seat the crowd, carry the dishes, grow the room. One bustling miniature bistro, one service at a time.'));
+      hero.appendChild(el('p', null, t('title.tagline')));
       sheet.appendChild(hero);
       var row = el('div', 'row');
       row.style.justifyContent = 'center';
-      var play = el('button', 'btn primary big', '▶ Play');
+      var play = el('button', 'btn primary big', t('title.play'));
       play.type = 'button';
       play.addEventListener('click', function () { showScreen('modes'); });
       row.appendChild(play);
       sheet.appendChild(row);
       var row2 = el('div', 'row');
       row2.style.justifyContent = 'center';
-      [['Daily challenge', 'daily'], ['Journey', 'journey'], ['Profile', 'profile'],
-       ['Leaderboard', 'leaderboard'], ['Settings', 'settings'], ['Help', 'help']].forEach(function (x) {
+      [[t('menu.daily'), 'daily'], [t('menu.journey'), 'journey'], [t('menu.profile'), 'profile'],
+       [t('menu.leaderboard'), 'leaderboard'], [t('menu.settings'), 'settings'], [t('menu.help'), 'help']].forEach(function (x) {
         var b = el('button', 'btn', x[0]);
         b.type = 'button';
         b.addEventListener('click', function () { showScreen(x[1]); });
@@ -663,14 +676,14 @@ import { accountStrings } from './gfx-strings.js';
       }
       var done = Object.keys(doc.progress.tutorialDone).length;
       if (done < 5) {
-        var tip = el('p', 'mini', 'New here? Start with Learn — five one-minute lessons.');
+        var tip = el('p', 'mini', t('title.newTip'));
         tip.style.textAlign = 'center';
         sheet.appendChild(tip);
       }
     },
 
     modes: function (sheet) {
-      sheet.appendChild(el('h2', null, 'Choose a mode'));
+      sheet.appendChild(el('h2', null, t('modes.title')));
       var box = el('div');
       sheet.appendChild(box);
       U.buildModeList(box, {
@@ -686,33 +699,33 @@ import { accountStrings } from './gfx-strings.js';
     },
 
     learn: function (sheet) {
-      sheet.appendChild(el('h2', null, 'Learn — one rule at a time'));
+      sheet.appendChild(el('h2', null, t('learn.title')));
       C.LESSONS.forEach(function (l) {
         var done = doc.progress.tutorialDone[l.id];
         var b = el('button', 'card mode-card');
         b.type = 'button';
-        b.appendChild(el('strong', null, (done ? '✓ ' : '') + l.title));
-        b.appendChild(el('span', 'card-desc', l.text));
+        b.appendChild(el('strong', null, (done ? '✓ ' : '') + t('l.' + l.id, null, l.title)));
+        b.appendChild(el('span', 'card-desc', t('lx.' + l.id, null, l.text)));
         b.addEventListener('click', function () { startGame(l.cfg, 'learn', { id: l.id, title: l.title, steps: l.steps, _step: 0 }); });
         sheet.appendChild(b);
       });
-      backRow(sheet, '← Modes', function () { showScreen('modes'); });
+      backRow(sheet, t('back.modes'), function () { showScreen('modes'); });
     },
 
     journey: function (sheet) {
-      sheet.appendChild(el('h2', null, 'Journey — 40 stages'));
+      sheet.appendChild(el('h2', null, t('journey.title')));
       var stars = Object.keys(doc.progress.journeyStars).length;
-      sheet.appendChild(el('p', 'mini', stars + '/40 stages completed. Every fifth stage is a mastery test.'));
+      sheet.appendChild(el('p', 'mini', t('journey.done', { n: stars })));
       var grid = el('div', 'level-grid');
       sheet.appendChild(grid);
       U.buildJourneyGrid(grid, C.JOURNEY, doc.progress, {
         onPick: function (cfg) { startGame(cfg, 'journey'); }
       });
-      backRow(sheet, '← Modes', function () { showScreen('modes'); });
+      backRow(sheet, t('back.modes'), function () { showScreen('modes'); });
     },
 
     practice: function (sheet) {
-      sheet.appendChild(el('h2', null, 'Practice'));
+      sheet.appendChild(el('h2', null, t('practice.title')));
       var box = el('div');
       sheet.appendChild(box);
       U.buildSetup(box, 'practice', { difficulties: C.PRACTICE }, {
@@ -720,22 +733,22 @@ import { accountStrings } from './gfx-strings.js';
           startGame(C.practiceCfg(o.difficulty, RNG.hashString(sessionId + Date.now()) >>> 0), 'practice');
         }
       });
-      backRow(sheet, '← Modes', function () { showScreen('modes'); });
+      backRow(sheet, t('back.modes'), function () { showScreen('modes'); });
     },
 
     challenge: function (sheet) {
-      sheet.appendChild(el('h2', null, 'Challenges'));
+      sheet.appendChild(el('h2', null, t('challenge.title')));
       var box = el('div');
       sheet.appendChild(box);
       U.buildSetup(box, 'challenge', { challenges: C.CHALLENGES, best: doc.progress.challengeBest }, {
         onStart: function (o) { startGame(o.cfg, 'challenge'); }
       });
-      backRow(sheet, '← Modes', function () { showScreen('modes'); });
+      backRow(sheet, t('back.modes'), function () { showScreen('modes'); });
     },
 
     daily: function (sheet) {
-      sheet.appendChild(el('h2', null, 'Daily challenge'));
-      var box = el('div', null, 'Checking today’s ruleset…');
+      sheet.appendChild(el('h2', null, t('daily.title')));
+      var box = el('div', null, t('daily.checking'));
       sheet.appendChild(box);
       syncServerTime().then(function () {
         var cfg = C.dailyCfg(utcDateStr());
@@ -743,18 +756,18 @@ import { accountStrings } from './gfx-strings.js';
           onStart: function (o) { startGame(o.cfg, 'daily'); }
         });
       });
-      backRow(sheet, '← Modes', function () { showScreen('modes'); });
+      backRow(sheet, t('back.modes'), function () { showScreen('modes'); });
     },
 
     settings: function (sheet) {
-      sheet.appendChild(el('h2', null, 'Settings'));
+      sheet.appendChild(i18nEl(el('h2'), 'settings.title'));
       var form = el('div');
       form.id = 'settings-form';
       sheet.appendChild(form);
       U.buildSettingsForm(form, settings, C.THEMES, {
         buildGraphics: function (box) {
-          buildGraphicsSection(box, {
-            locale: navigator.language,
+          gfxRender = buildGraphicsSection(box, {
+            locale: curLang,
             saved: function () { return settings.gfx; },
             detected: detectedPreset,
             info: graphicsInfo,
@@ -775,7 +788,7 @@ import { accountStrings } from './gfx-strings.js';
     },
 
     help: function (sheet) {
-      sheet.appendChild(el('h2', null, 'How to play'));
+      sheet.appendChild(el('h2', null, t('help.title')));
       var box = el('div');
       sheet.appendChild(box);
       U.buildHelp(box, keysText());
@@ -783,20 +796,20 @@ import { accountStrings } from './gfx-strings.js';
     },
 
     profile: function (sheet) {
-      sheet.appendChild(el('h2', null, 'Profile'));
+      sheet.appendChild(el('h2', null, t('profile.title')));
       var box = el('div');
       sheet.appendChild(box);
       U.buildProfile(box, doc.progress, S.ACHIEVEMENTS);
       var row = el('div', 'row');
-      var reset = el('button', 'btn', 'Reset all progress');
+      var reset = el('button', 'btn', t('profile.reset'));
       reset.type = 'button';
       reset.addEventListener('click', function () {
-        if (confirm('Erase all local progress and settings?')) {
+        if (confirm(t('profile.confirm'))) {
           doc = S.fresh(); settings = doc.settings; persist(); applySettings(); showScreen('title');
         }
       });
       row.appendChild(reset);
-      var replay = el('button', 'btn', 'Replay tutorial');
+      var replay = el('button', 'btn', t('profile.replay'));
       replay.type = 'button';
       replay.addEventListener('click', function () { showScreen('learn'); });
       row.appendChild(replay);
@@ -805,19 +818,22 @@ import { accountStrings } from './gfx-strings.js';
     },
 
     leaderboard: function (sheet) {
-      sheet.appendChild(el('h2', null, 'Leaderboards'));
+      sheet.appendChild(el('h2', null, t('lb.title')));
       var box = el('div');
       sheet.appendChild(box);
       var daily = C.dailyCfg(utcDateStr());
       var local = S.loadBoards().entries.filter(function (e) { return e.cfgId === daily.id; });
-      U.buildLeaderboard(box, local, C.rivalScores(daily), 'Today — ' + daily.id, profileFor);
-      box.appendChild(el('p', 'mini', 'Scores on this device.'));
+      U.buildLeaderboard(box, local, C.rivalScores(daily), t('lb.today', { id: daily.id }), profileFor);
+      box.appendChild(el('p', 'mini', t('lb.device')));
       backRow(sheet);
     }
   };
 
+  var gfxRender = null;      // redraws the Graphics section (gfx-panel.js) in the current language
+  var screenRefresh = null;  // re-renders the open screen after a language change
   function showScreen(name) {
     if (game && !game.over && !game.paused) return; // in-round overlays come via pause
+    screenRefresh = function () { showScreen(name); };
     openScreen(function (sheet) { (screens[name] || screens.title)(sheet); }, name);
   }
 
@@ -840,14 +856,15 @@ import { accountStrings } from './gfx-strings.js';
     if (!game || game.over) return;
     game.paused = on;
     if (on) {
+      screenRefresh = function () { if (game && !game.over) pauseGame(true); };
       openScreen(function (sheet) {
-        sheet.appendChild(el('h2', null, 'Paused'));
-        sheet.appendChild(el('p', 'mini', game.cfg.name + ' — service clock is stopped.'));
+        sheet.appendChild(el('h2', null, t('pause.title')));
+        sheet.appendChild(el('p', 'mini', t('pause.desc', { name: U.cfgName(game.cfg) })));
         var row = el('div', 'row');
-        [['▶ Resume', function () { game.paused = false; game.lastFrame = performance.now(); closeScreen(); }, 'primary'],
-         ['Settings', function () { showScreen('settings'); }],
-         ['Help', function () { showScreen('help'); }],
-         ['Leave service', function () { closeScreen(); endGame('resign'); }]].forEach(function (x) {
+        [[t('pause.resume'), function () { game.paused = false; game.lastFrame = performance.now(); closeScreen(); }, 'primary'],
+         [t('pause.settings'), function () { showScreen('settings'); }],
+         [t('pause.help'), function () { showScreen('help'); }],
+         [t('pause.leave'), function () { closeScreen(); endGame('resign'); }]].forEach(function (x) {
           var b = el('button', 'btn ' + (x[2] || ''), x[0]);
           b.type = 'button';
           b.addEventListener('click', x[1]);
@@ -860,56 +877,68 @@ import { accountStrings } from './gfx-strings.js';
   }
 
   // ---------- results ----------
-  function showResults(t, unlocked, envelope) {
-    var cfg = game.cfg, mode = game.mode;
+  // ctx = { cfg, mode, lb }: kept so a language change re-renders the card
+  // without posting the score again (ctx.lb holds the leaderboard outcome).
+  function showResults(term, unlocked, envelope, ctx) {
+    ctx = ctx || { cfg: game.cfg, mode: game.mode, lb: null };
+    var cfg = ctx.cfg, mode = ctx.mode;
+    screenRefresh = function () { showResults(term, unlocked, envelope, ctx); };
     openScreen(function (sheet) {
-      var win = t.win || mode === 'learn';
+      var win = term.win || mode === 'learn';
       var head = el('h2', 'outcome-head ' + (win ? 'win' : 'lose'),
-        mode === 'learn' ? 'Lesson complete!' :
-        win ? (t.reason === 'goal-reached' ? 'Goal reached!' : 'Day complete!') : 'Service over — goal missed.');
+        mode === 'learn' ? t('r.lesson') :
+        win ? (term.reason === 'goal-reached' ? t('r.goal') : t('r.day')) : t('r.missed'));
       sheet.appendChild(head);
       var art = el('img', 'result-art');
       art.src = win ? 'assets/results-win.webp' : 'assets/results-lose.webp'; art.alt = ''; art.decoding = 'async';
       art.addEventListener('error', function () { art.remove(); });
       sheet.appendChild(art);
       sheet.appendChild(el('p', 'mini',
-        cfg.name + ' · seed ' + (cfg.seed >>> 0).toString(36) + ' · content v' + envelope.contentVersion + ' · build ' + envelope.build));
+        t('r.meta', { name: U.cfgName(cfg), seed: (cfg.seed >>> 0).toString(36), c: envelope.contentVersion, b: envelope.build })));
 
       var table = el('table', 'results-table');
       var tbody = el('tbody');
       table.appendChild(tbody);
-      U.buildResults(tbody, t, cfg);
+      U.buildResults(tbody, term, cfg);
       sheet.appendChild(table);
 
       if (mode === 'journey') {
-        var stars = U.starsFor(cfg, t);
-        sheet.appendChild(el('p', null, '★★★'.slice(0, stars) + '☆☆☆'.slice(0, 3 - stars) + ' — par ' + cfg.par.score));
+        var stars = U.starsFor(cfg, term);
+        sheet.appendChild(el('p', null, t('r.par', { stars: '★★★'.slice(0, stars) + '☆☆☆'.slice(0, 3 - stars), n: cfg.par.score })));
       }
       if (unlocked.length) {
-        var ua = el('p', null, '🏅 Achievement unlocked: ' + unlocked.map(function (k) {
+        var ua = el('p', null, t('r.ach', { list: unlocked.map(function (k) {
           var a = S.ACHIEVEMENTS.find(function (x) { return x.key === k; });
-          return a ? a.name : k;
-        }).join(', '));
+          return t('ach.' + k, null, a ? a.name : k);
+        }).join(', ') }));
         sheet.appendChild(ua);
       }
       if (mode !== 'learn' && P.hosted) { // StarHermit high-score board
-        var lbLine = el('p', 'mini lb-line', ACCOUNT.lbPosting);
+        var lbText = function (r) {
+          return !r ? ACCOUNT.lbPosting : !r.posted ? ACCOUNT.lbNotPosted
+            : r.rank ? ACCOUNT.lbRank.replace('{rank}', r.rank) : ACCOUNT.lbPosted;
+        };
+        var lbLine = el('p', 'mini lb-line', lbText(ctx.lb));
         lbLine.setAttribute('aria-live', 'polite');
         sheet.appendChild(lbLine);
-        P.submitScore(t.score.total).then(function (r) {
-          lbLine.textContent = !r.posted ? ACCOUNT.lbNotPosted
-            : r.rank ? ACCOUNT.lbRank.replace('{rank}', r.rank) : ACCOUNT.lbPosted;
-        });
+        if (!ctx.posted) {
+          ctx.posted = true;
+          P.submitScore(term.score.total).then(function (r) {
+            ctx.lb = r;
+            var line = document.querySelector('.lb-line');
+            if (line) line.textContent = lbText(r);
+          });
+        }
       }
       if (cfg.ranked) {
         var lb = el('div');
         sheet.appendChild(lb);
         var local = S.loadBoards().entries.filter(function (e) { return e.cfgId === cfg.id; });
-        U.buildLeaderboard(lb, local, C.rivalScores(cfg), 'Score comparison');
+        U.buildLeaderboard(lb, local, C.rivalScores(cfg), t('lb.compare'));
       }
 
       var row = el('div', 'row');
-      var retry = el('button', 'btn primary', '↻ ' + (win ? 'Play again' : 'Retry'));
+      var retry = el('button', 'btn primary', t(win ? 'r.again' : 'r.retry'));
       retry.type = 'button';
       retry.addEventListener('click', function () {
         var lesson = mode === 'learn' ? C.LESSONS.find(function (l) { return l.cfg.id === cfg.id; }) : null;
@@ -920,13 +949,13 @@ import { accountStrings } from './gfx-strings.js';
       if (mode === 'journey' && win) {
         var idx = C.JOURNEY.findIndex(function (c) { return c.id === cfg.id; });
         if (idx >= 0 && idx + 1 < C.JOURNEY.length) {
-          next = el('button', 'btn', 'Next stage →');
+          next = el('button', 'btn', t('r.next'));
           next.type = 'button';
           next.addEventListener('click', function () { startGame(C.JOURNEY[idx + 1], 'journey'); });
           row.appendChild(next);
         }
       }
-      var home = el('button', 'btn', 'Home');
+      var home = el('button', 'btn', t('r.home'));
       home.type = 'button';
       home.addEventListener('click', function () { game = null; showScreen('title'); });
       row.appendChild(home);
@@ -977,12 +1006,14 @@ import { accountStrings } from './gfx-strings.js';
   }
   function keyName(action) {
     var c = (keyBindings[action] || [])[0] || '';
-    return { Escape: 'Esc', Space: 'Space' }[c] || c.replace(/^Key/, '').replace(/^Digit/, '').replace(/^Numpad/, 'Num ');
+    return { Escape: 'Esc', Space: t('key.Space') }[c] || c.replace(/^Key/, '').replace(/^Digit/, '').replace(/^Numpad/, 'Num ');
   }
   function keysText() {
-    return keyName('table1') + '–' + keyName('table9') + ' serve table · ' + keyName('pickup') + ' pick up dishes · ' +
-      keyName('hint') + ' hint · ' + keyName('undo') + ' rewind (practice) · ' + keyName('camera') + ' camera · ' +
-      keyName('speed') + ' fast-forward · ' + keyBindings.pause.map(function (c) { return c === 'Escape' ? 'Esc' : c.replace(/^Key/, ''); }).join('/') + ' pause.';
+    return t('help.keys', {
+      t1: keyName('table1'), t9: keyName('table9'), pickup: keyName('pickup'), hint: keyName('hint'), undo: keyName('undo'),
+      camera: keyName('camera'), speed: keyName('speed'),
+      pause: keyBindings.pause.map(function (c) { return c === 'Escape' ? 'Esc' : c.replace(/^Key/, ''); }).join('/')
+    });
   }
 
   function accountLine() {
@@ -1058,9 +1089,9 @@ import { accountStrings } from './gfx-strings.js';
     if (pressed(1)) pauseGame(true);
   }
   function describeAction(a) {
-    if (a.type === 'serve') return 'Serve table ' + (a.table + 1);
-    if (a.type === 'pickup') return 'Pick up dishes';
-    if (a.type === 'buy') return 'Buy ' + U.BUY_LABELS[a.item] + ' (' + a.cost + 'c)';
+    if (a.type === 'serve') return t('gp.serve', { n: a.table + 1 });
+    if (a.type === 'pickup') return t('gp.pickup');
+    if (a.type === 'buy') return t('gp.buy', { item: U.buyLabel(a.item), n: a.cost });
     return a.type;
   }
 
@@ -1074,11 +1105,38 @@ import { accountStrings } from './gfx-strings.js';
     } else {
       if (!game || game.paused) { /* stay muted while the pause menu is up */ }
       else A.resume();
-      if (game && !game.over) showToast('Service paused while you were away — nothing was lost.');
+      if (game && !game.over) showToast(t('toast.away'));
     }
   });
   window.addEventListener('resize', function () { if (view) view.resize(); });
   window.addEventListener('orientationchange', function () { setTimeout(function () { if (view) view.resize(); }, 250); });
+
+  function esc(v) {
+    return String(v).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; });
+  }
+
+  // Language changed (Settings → Language, or the account preference arrived).
+  // The open Settings screen relabels in place (the Language control keeps its
+  // focus); any other screen is re-rendered; a running service keeps its state.
+  function onLanguageChange() {
+    ACCOUNT = accountStrings(curLang());
+    if (I18N) I18N.apply(app);
+    if (game && !game.over) {
+      buildHudActions();
+      updateHud();
+      if (game.lesson) renderLessonStep(true);
+    }
+    var name = currentScreenName();
+    if (name === 'settings' && screenEl) {
+      I18N.apply(screenEl);
+      var back = screenEl.querySelector('.row .btn');
+      if (back) back.textContent = t('back');
+      if (gfxRender) gfxRender();
+    } else if (screenEl && screenRefresh) {
+      screenRefresh();
+    }
+  }
+  document.addEventListener('bb-language', onLanguageChange);
 
   // ---------- boot ----------
   buildShell();
@@ -1090,7 +1148,15 @@ import { accountStrings } from './gfx-strings.js';
   P.init({
     onProfile: refreshAccountLine,
     onSync: refreshAccountLine,
-    onAuth: function (a) { if (!a.signedIn) signedOutNotice = true; if (currentScreenName() === 'title') showScreen('title'); }
+    onAuth: function (a) { if (!a.signedIn) signedOutNotice = true; if (currentScreenName() === 'title') showScreen('title'); },
+    // Another device saved first: merge both documents (better records win,
+    // local settings stay) and save the merge; a service in progress is in memory.
+    onConflict: function (raw) {
+      var merged = S.mergeDocs(raw ? S.loadRaw(raw) : null, doc);
+      doc.progress = merged.progress;
+      persist();
+      if (currentScreenName() === 'title') showScreen('title');
+    }
   }).then(function (remoteRaw) {
     refreshAccountLine();
     if (!P.hosted) return;

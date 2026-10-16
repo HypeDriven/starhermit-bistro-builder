@@ -75,6 +75,37 @@
     return { v: SAVE_VERSION, settings: copySettings(null), progress: defaultProgress() };
   }
 
+  // Another device saved the cloud slot since this one loaded it: combine the
+  // two documents so neither side's progress is lost. Records keep the better
+  // value (stars, best scores, counters, latest daily), unlock maps are
+  // unioned (earliest achievement time), and this device's settings win.
+  function mergeDocs(remote, local) {
+    var r = migrate(remote ? JSON.parse(JSON.stringify(remote)) : null);
+    var l = migrate(local ? JSON.parse(JSON.stringify(local)) : null);
+    if (!r) return l || fresh();
+    if (!l) return r;
+    var rp = r.progress, lp = l.progress, out = l;
+    function better(a, b) {
+      if (typeof a === 'number' && typeof b === 'number') return Math.max(a, b);
+      if (typeof a === 'string' && typeof b === 'string') return a > b ? a : b;
+      return a || b;
+    }
+    function mergeMap(a, b) {
+      var m = {}, k;
+      for (k in a) m[k] = a[k];
+      for (k in b) m[k] = k in m ? better(m[k], b[k]) : b[k];
+      return m;
+    }
+    ['tutorialDone', 'journeyStars', 'journeyBest', 'challengeBest', 'dailiesDone', 'practiceBest', 'stats'].forEach(function (k) {
+      out.progress[k] = mergeMap(rp[k] || {}, lp[k] || {});
+    });
+    var ach = {}, key;
+    for (key in rp.achievements) ach[key] = rp.achievements[key];
+    for (key in lp.achievements) ach[key] = ach[key] ? Math.min(ach[key], lp.achievements[key]) : lp.achievements[key];
+    out.progress.achievements = ach;
+    return out;
+  }
+
   var memoryFallback = null; // used when localStorage is unavailable
 
   // Parses a wrapped {sum, payload} string into a migrated doc, or null.
@@ -141,7 +172,7 @@
     SAVE_VERSION: SAVE_VERSION,
     DEFAULT_SETTINGS: DEFAULT_SETTINGS,
     ACHIEVEMENTS: ACHIEVEMENTS,
-    load: load, loadRaw: loadRaw, save: save, fresh: fresh, migrate: migrate,
+    load: load, loadRaw: loadRaw, mergeDocs: mergeDocs, save: save, fresh: fresh, migrate: migrate,
     checksum: checksum,
     loadBoards: loadBoards, saveBoards: saveBoards, sortEntries: sortEntries
   };

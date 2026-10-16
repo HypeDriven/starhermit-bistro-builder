@@ -20,9 +20,11 @@ function el(tag, cls, text) {
  *         onChange(nextSaved), locale }
  */
 export function buildGraphicsSection(container, opts) {
-  const S = strings(opts.locale);
+  // opts.locale may be a function so a language change redraws in the new locale.
+  const locale = () => (typeof opts.locale === 'function' ? opts.locale() : opts.locale);
 
   function render() {
+    const S = strings(locale());
     const focusId = document.activeElement && container.contains(document.activeElement) ? document.activeElement.id : null;
     container.innerHTML = '';
     const saved = Object.assign({}, DEFAULTS, opts.saved() || {});

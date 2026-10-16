@@ -34,7 +34,12 @@ function boot({ hash = '' } = {}) {
     const u = decodeURIComponent(url);
     if (u.endsWith('/api/v1/users/' + USER + '/profile')) return Response.json({ nickname: 'Fletch' });
     if (u.endsWith('/cloud-saves/game:' + SLUG)) {
-      if (method === 'PUT') { cloud.bytes = Buffer.from(JSON.parse(init.body).dataBase64, 'base64'); return new Response(null, { status: 204 }); }
+      if (method === 'PUT') {
+        if (cloud.conflict) { cloud.conflict = false; return Response.json({ etag: '"other"' }, { status: 412 }); }
+        cloud.puts = (cloud.puts || 0) + 1;
+        cloud.bytes = Buffer.from(JSON.parse(init.body).dataBase64, 'base64');
+        return Response.json({ etag: '"v' + cloud.puts + '"' });
+      }
       return cloud.bytes ? new Response(cloud.bytes) : new Response('', { status: 404 });
     }
     if (u.endsWith('/games/' + SLUG + '/settings')) {
@@ -47,9 +52,9 @@ function boot({ hash = '' } = {}) {
   ctx.self = ctx;
   ctx.window = ctx;
   vm.createContext(ctx);
-  for (const f of ['starhermit-sdk.js', 'js/platform.js'])
+  for (const f of ['starhermit-sdk.js', 'js/platform.js', 'js/rng.js', 'js/store.js'])
     vm.runInContext(fs.readFileSync(path.join(ROOT, f), 'utf8'), ctx, { filename: f });
-  return { ctx, calls, cloud, kv, P: ctx.BBPlatform, SH: ctx.StarHermit };
+  return { ctx, calls, cloud, kv, P: ctx.BBPlatform, SH: ctx.StarHermit, S: ctx.BBStore };
 }
 
 const wrap = doc => { const payload = JSON.stringify(doc); return JSON.stringify({ sum: 'x', payload }); };
@@ -129,4 +134,53 @@ test('account strings exist in every required locale', async () => {
   const keys = Object.keys(PLATFORM_STRINGS['en-US']);
   for (const loc of ['en-US', 'en-GB', 'es-419', 'es-ES', 'de-DE', 'fr-FR', 'fr-CA', 'pt-BR', 'it-IT'])
     for (const k of keys) assert.ok(PLATFORM_STRINGS[loc] && PLATFORM_STRINGS[loc][k], loc + '.' + k);
+});
+
+test('save conflict: the cloud copy is reloaded and merged, keeping the better records', async () => {
+  const token = jwt({ sub: USER, game_scope: SLUG, exp: Math.floor(Date.now() / 1000) + 3600 });
+  const { P, SH, S, cloud } = boot({ hash: '#game_token=' + token });
+  const conflicts = [];
+  await P.init({ onConflict: raw => conflicts.push(raw) });
+  const mine = S.fresh(); mine.progress.journeyStars = { j01: 3 }; mine.progress.stats.rounds = 4;
+  const theirs = S.fresh(); theirs.progress.journeyStars = { j01: 1, j02: 2 }; theirs.progress.practiceBest = { rush: 99 };
+  theirs.progress.stats.rounds = 7; theirs.progress.stats.lastDaily = '2026-10-15'; theirs.settings.music = 0;
+  const wrapDoc = d => { const payload = JSON.stringify(d); return JSON.stringify({ sum: S.checksum(payload), payload }); };
+  P.onLocalSave(wrapDoc(mine)); await P.flushCloud();
+  cloud.conflict = true;
+  P.onLocalSave(wrapDoc(mine));
+  const other = boot({ hash: '#game_token=' + token });
+  await other.P.init();
+  other.P.onLocalSave(wrapDoc(theirs)); await other.P.flushCloud();
+  cloud.bytes = other.cloud.bytes;
+  await P.flushCloud();
+  await new Promise(r => setTimeout(r, 30));
+  assert.equal(SH.saveConflicted(), false, 'reload clears the conflict');
+  assert.equal(conflicts.length, 1);
+  const merged = S.mergeDocs(S.loadRaw(conflicts[0]), mine);
+  assert.deepEqual(JSON.parse(JSON.stringify(merged.progress.journeyStars)), { j01: 3, j02: 2 });
+  assert.equal(merged.progress.practiceBest.rush, 99);
+  assert.equal(merged.progress.stats.rounds, 7);
+  assert.equal(merged.progress.stats.lastDaily, '2026-10-15');
+  assert.equal(merged.settings.music, mine.settings.music, 'local settings kept');
+});
+
+test('every player-facing string and content name exists in all nine locales', async () => {
+  const { createRequire } = await import('node:module');
+  const req = createRequire(import.meta.url);
+  const I = req('../js/i18n.js');
+  const ctx = { console }; ctx.self = ctx; vm.createContext(ctx);
+  for (const f of ['js/rng.js', 'js/content.js', 'js/store.js']) vm.runInContext(fs.readFileSync(path.join(ROOT, f), 'utf8'), ctx, { filename: f });
+  const C = ctx.BBContent, S = ctx.BBStore;
+  assert.deepEqual(I.LOCALES, ['en-US', 'en-GB', 'es-419', 'es-ES', 'de-DE', 'fr-FR', 'fr-CA', 'pt-BR', 'it-IT']);
+  const keys = Object.keys(I.STRINGS['en-US']);
+  for (const loc of I.LOCALES) {
+    const T = I.STRINGS[loc];
+    for (const k of keys) assert.ok(T[k], loc + '.' + k);
+    for (const c of C.JOURNEY) assert.ok(T['j.' + c.id], loc + ' ' + c.id);
+    for (const c of C.CHALLENGES) { const id = c.id.replace(/^challenge-/, ''); assert.ok(T['ch.' + id] && T['chd.' + id], loc + ' ' + id); }
+    for (const l of C.LESSONS) { assert.ok(T['l.' + l.id] && T['lx.' + l.id]); l.steps.forEach((_, i) => assert.ok(T['ls.' + l.id + '.' + i], loc + ' ' + l.id + i)); }
+    for (const d of Object.keys(C.PRACTICE)) assert.ok(T['pd.' + d]);
+    for (const k of Object.keys(C.THEMES)) assert.ok(T['theme.' + k]);
+    for (const a of S.ACHIEVEMENTS) assert.ok(T['ach.' + a.key] && T['ach.' + a.key + '.d']);
+  }
 });

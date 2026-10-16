@@ -31,6 +31,7 @@ import http from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { extname, join, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { stubStarHermit, launchToken } from './starhermit-e2e.mjs';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 
@@ -49,7 +50,9 @@ const server = http.createServer(async (req, res) => {
     const url = new URL(req.url, 'http://localhost');
     // Plain static host: a standalone load must never call own-server routes.
     if (url.pathname.startsWith('/api') || url.pathname.startsWith('/ws')) {
-      ownServerHits.push(req.method + ' ' + url.pathname);
+      // Signed-in (stubbed) pages send a bearer token; an unload-time keepalive
+      // save can bypass page.route. Only token-less calls count.
+      if (!req.headers.authorization) ownServerHits.push(req.method + ' ' + url.pathname);
       res.statusCode = 404;
       return res.end();
     }
@@ -159,7 +162,7 @@ async function playUntilResults(page, pass, useKeys, timeoutMs) {
 
 async function runPass(browser, pass, viewport, hasTouch) {
   const errors = [];
-  const context = await browser.newContext({ viewport, hasTouch });
+  const context = await browser.newContext({ viewport, hasTouch, locale: 'en-US' });
   const page = await context.newPage();
   page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`));
   page.on('console', (m) => {
@@ -330,6 +333,55 @@ async function runPass(browser, pass, viewport, hasTouch) {
       console.log(`  [${pass}] resign outcome: ${head}`);
       await page.screenshot({ path: SHOT('resign-results', pass) });
       await page.getByRole('button', { name: 'Home' }).click();
+      await page.waitForSelector('.screen[aria-label="title"]');
+    });
+
+    await step('Language: Automatic follows the StarHermit preferred language; Settings → Language re-renders a paused service live and saves ui.language; report a problem', async () => {
+      const calls = await stubStarHermit(page, { preferredLanguage: 'fr-CA' });
+      await page.goto('about:blank');
+      await page.goto(`http://127.0.0.1:${server.address().port}/index.html#game_token=${launchToken()}`, { waitUntil: 'load' });
+      await page.waitForFunction(() => document.documentElement.lang === 'fr-CA');
+      await page.getByRole('button', { name: '▶ Jouer' }).click();
+      await page.locator('.mode-card', { hasText: 'Entraînement' }).click();
+      await page.locator('.mode-card', { hasText: 'Service calme' }).click();
+      await page.waitForSelector('.station-list', { state: 'attached', timeout: 8000 });
+      await page.waitForTimeout(3200); // countdown
+      if (!/^Pièces/.test(await page.textContent('.stat-chip'))) throw new Error('HUD chips not in fr-CA');
+      await page.getByRole('button', { name: 'Pause', exact: true }).click();
+      await page.waitForSelector('.screen[aria-label="Paused"]');
+      const servedBefore = await page.evaluate(() => [...document.querySelectorAll('.stat-chip')].map((c) => c.textContent).join('|'));
+      await page.getByRole('button', { name: 'Paramètres', exact: true }).click();
+      const choice = page.locator('#gfx-section [data-game-language="choice"]');
+      await choice.waitFor({ state: 'attached' });
+      await choice.scrollIntoViewIfNeeded();
+      const autoLabel = await choice.locator('option').first().textContent();
+      if (!/^Automatique — Français \(Canada\)$/.test(autoLabel)) throw new Error('Automatic label not resolved: ' + autoLabel);
+      await choice.selectOption('it-IT');
+      await page.waitForFunction(() => document.documentElement.lang === 'it-IT');
+      await page.waitForFunction(() => /Salvato/.test(document.querySelector('[data-game-language="status"]').textContent));
+      if (calls.settings['ui.language']?.choice !== 'it-IT') throw new Error('ui.language not saved: ' + JSON.stringify(calls.settings));
+      if ((await page.textContent('.screen h2')) !== 'Impostazioni') throw new Error('settings heading not re-rendered');
+      if ((await page.textContent('#settings-form .setting-row span')) !== 'Musica') throw new Error('settings rows not re-rendered');
+      if ((await page.inputValue('#gfx-section [data-game-language="choice"]')) !== 'it-IT') throw new Error('language control lost its value');
+      await page.locator('[data-game-report="title"]').scrollIntoViewIfNeeded();
+      await page.fill('[data-game-report="title"]', 'Test report');
+      await page.click('[data-game-report="send"]');
+      await page.waitForFunction(() => /Grazie/.test(document.querySelector('[data-game-report="status"]').textContent));
+      if (!calls.reports?.[0] || calls.reports[0].kind !== 'bug') throw new Error('report not posted');
+      await page.screenshot({ path: SHOT('language', pass) });
+      await page.getByRole('button', { name: '← Indietro' }).click();
+      await page.waitForSelector('.screen[aria-label="Paused"]');
+      if ((await page.textContent('.screen h2')) !== 'In pausa') throw new Error('pause screen not re-rendered');
+      const servedAfter = await page.evaluate(() => [...document.querySelectorAll('.stat-chip')].map((c) => c.textContent).join('|'));
+      if (!/^Monete/.test(servedAfter)) throw new Error('HUD not re-rendered: ' + servedAfter);
+      if (servedBefore.replace(/[^\d|:/]/g, '') !== servedAfter.replace(/[^\d|:/]/g, '')) throw new Error(`service state changed across the language change: ${servedBefore} → ${servedAfter}`);
+      await page.getByRole('button', { name: 'Impostazioni', exact: true }).click();
+      await page.locator('#gfx-section [data-game-language="choice"]').selectOption('auto');
+      await page.waitForFunction(() => document.documentElement.lang === 'fr-CA');
+      await page.getByRole('button', { name: '← Retour' }).click();
+      await page.getByRole('button', { name: 'Quitter le service' }).click();
+      await page.waitForSelector('.screen .results-table', { timeout: 10000 });
+      await page.getByRole('button', { name: 'Accueil' }).click();
       await page.waitForSelector('.screen[aria-label="title"]');
     });
   } finally {

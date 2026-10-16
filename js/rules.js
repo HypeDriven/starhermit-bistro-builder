@@ -376,21 +376,21 @@
     var i;
     for (i = 0; i < legal.length; i++)
       if (legal[i].type === 'serve' && legal[i].urgent)
-        return { action: legal[i], text: 'Table ' + (legal[i].table + 1) + ' is about to walk out — serve it now.' };
+        return { action: legal[i], key: 'hint.urgent', vars: { n: legal[i].table + 1 }, text: 'Table ' + (legal[i].table + 1) + ' is about to walk out — serve it now.' };
     for (i = 0; i < legal.length; i++)
       if (legal[i].type === 'serve')
-        return { action: legal[i], text: 'A guest is waiting at table ' + (legal[i].table + 1) + '.' };
+        return { action: legal[i], key: 'hint.waiting', vars: { n: legal[i].table + 1 }, text: 'A guest is waiting at table ' + (legal[i].table + 1) + '.' };
     for (i = 0; i < legal.length; i++)
       if (legal[i].type === 'pickup')
-        return { action: legal[i], text: 'Dishes are ready — pick them up from the kitchen.' };
+        return { action: legal[i], key: 'hint.pickup', text: 'Dishes are ready — pick them up from the kitchen.' };
     if (state.stock === 0 && state.waiters[0].carrying === 0) {
       var anyWaiting = state.guests.some(function (g) { return g.status === 'seated'; });
-      if (anyWaiting) return { action: null, text: 'The kitchen is still cooking — a dish will be ready soon.' };
+      if (anyWaiting) return { action: null, key: 'hint.cooking', text: 'The kitchen is still cooking — a dish will be ready soon.' };
     }
     for (i = 0; i < legal.length; i++)
       if (legal[i].type === 'buy')
-        return { action: legal[i], text: 'You can afford an upgrade: ' + legal[i].item + ' for ' + legal[i].cost + ' coins.' };
-    return { action: null, text: 'Seat is open — wait for the next guest at the door.' };
+        return { action: legal[i], key: 'hint.upgrade', vars: { item: legal[i].item, n: legal[i].cost }, text: 'You can afford an upgrade: ' + legal[i].item + ' for ' + legal[i].cost + ' coins.' };
+    return { action: null, key: 'hint.idle', text: 'Seat is open — wait for the next guest at the door.' };
   }
 
   // ---------- commands ----------
