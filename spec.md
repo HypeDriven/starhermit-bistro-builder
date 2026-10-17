@@ -228,11 +228,10 @@ Every screen is a `.screen[role=dialog][aria-label=<name>]` sheet (max 720 px) o
 
 Segment scaling covers guests, tables, plates, candles, stoves, rings, bulbs and props (the invisible pick volumes keep their shape, so interaction is identical). Textures are generated procedurally at load (tile, wood, plaster, street) at the budget's size and cached per size. Steam puffs scale within the preset by the hardware level (`StarHermitGpu.scaleBudget`, ≤ 2×). A preset change that alters the budget rebuilds the board.
 
-**60 FPS benchmark** (`node tools/gfx-bench.mjs bistro-builder [--mobile --presets low,balanced]`, dev-only, real GPUs; hook `tests/gfx-bench.mjs` picks the preset in Settings → Graphics, starts Journey stage 1 and keeps picking up and serving through the station buttons). Measured 2026-10-17 under heavy machine load:
+**60 FPS benchmark** (`node tools/gfx-bench.mjs bistro-builder [--mobile --presets low,balanced]`, dev-only, real GPUs; hook `tests/gfx-bench.mjs` picks the preset in Settings → Graphics, starts Journey stage 1 and keeps picking up and serving through the station buttons). Measured 2026-10-17 with the revised gate (an empty full-window canvas is measured before each preset and subtracted percentile for percentile; typical p50 ≤ 12 ms and slow p90 ≤ 14 ms at the preset's floor level, CPU p90 ≤ 6 ms):
 
-- Desktop 1920×1080: FAIL low (GPU p90 10.78 ms on level 2 → ≈ 16.31 ms at level 0, CPU p90 1.10 ms); PASS balanced (17.88 → ≈ 11.82 ms at level 4, CPU 1.80 ms); PASS high (37.54 → ≈ 7.17 ms at level 10, CPU 2.20 ms); PASS ultra (88.74 → ≈ 3.98 ms at level 17, CPU 2.00 ms).
-- Mobile 390×844 @3×: FAIL low (16.59 → ≈ 25.11 ms, CPU 1.00 ms); PASS balanced (14.14 → ≈ 9.34 ms, CPU 1.50 ms).
-- Low is at the benchmark's floor: an empty WebGL page measured 8.3–11.6 ms (desktop) and 13–15 ms (mobile) on the iGPU that day, against a 9.25 ms allowance at level 2.
+- Desktop 1920×1080: PASS low (GPU p50 9.24 / p90 11.91 ms, empty canvas 10.16 / 11.79, on level 2 → at level 0: typical 0.00, slow 0.17; CPU p90 1.00 ms); PASS balanced (typical 6.86, slow 4.92 at level 4; CPU 1.60 ms); PASS high (typical 5.26, slow 4.90 at level 10; CPU 1.90 ms); PASS ultra (typical 3.43, slow 3.87 at level 17; CPU 2.10 ms).
+- Mobile 390×844 @3×: PASS low (typical 1.90, slow 7.48 at level 0; CPU 1.30 ms); PASS balanced (typical 5.89, slow 3.60 at level 4; CPU 1.70 ms).
 
 ## 9. Audio direction
 

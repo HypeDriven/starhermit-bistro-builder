@@ -21,6 +21,15 @@ import { FXAAShader } from 'three/addons/shaders/FXAAShader.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { resolve as resolveGfx, SHADOW_MAP } from './gfx.js';
 
+// EffectComposer resizes every pass to the full frame (addPass / setSize); this keeps a pass at a
+// fraction of it (used for the preset budget's bloom resolution).
+function atScale(pass, k) {
+  const setSize = pass.setSize.bind(pass);
+  pass.setSize = (w, h) => setSize(Math.max(1, Math.round(w * k)), Math.max(1, Math.round(h * k)));
+  return pass;
+}
+
+
 const LAYER_ENV = 0, LAYER_PICK = 1; // pick meshes live on their own layer
 
 const TILE = 1.0;            // world units per grid tile
@@ -865,7 +874,7 @@ function api(container, callbacks) {
       // High threshold: only emissive lamps, candles, burners and the door glow bloom.
       if (q.bloom === 'on') { // bloom at the budget's fraction of the canvas resolution
         const br = BUD.bloomRes;
-        c.addPass(new UnrealBloomPass(new THREE.Vector2(Math.round(pw * br), Math.round(ph * br)), 0.55, 0.3, 0.92));
+        c.addPass(atScale(new UnrealBloomPass(new THREE.Vector2(Math.round(pw * br), Math.round(ph * br)), 0.55, 0.3, 0.92), br));
       }
       c.addPass(new OutputPass());
       if (q.grade === 'on') c.addPass(new ShaderPass(GradeShader));
