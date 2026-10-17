@@ -104,7 +104,7 @@ export function buildGraphicsSection(container, opts) {
     // summary: GPU · cost · W×H px
     const info = opts.info() || {};
     const summary = el('p', 'mini gfx-summary',
-      (info.gpu || S.unknownGpu) + ' · ' + describe(r, info.pixels, S.words));
+      (info.gpu || S.unknownGpu) + ' · ' + S.level.replace('{level}', info.level == null ? 0 : info.level) + ' · ' + describe(r, info.pixels, S.words));
     summary.id = 'gfx-summary';
     summary.setAttribute('data-gfx-preset', r.preset);
     summary.setAttribute('aria-live', 'polite');

@@ -66,17 +66,26 @@ function makeRenderer(antialias) {
   return renderer;
 }
 
-// ---------- procedural textures (cached; shared across rebuilds, never disposed) ----------
+// ---------- per-preset budget (js/gfx.js BUDGETS), read by the module-level builders ----------
+let BUD = { maxDpr: 2, material: 'physical', segments: 1, texture: 1, steam: 6, bloomRes: 1 };
+/** Segment count scaled by the budget (never below 3). */
+function seg(n) { return Math.max(3, Math.round(n * BUD.segments)); }
+
+// ---------- procedural textures (cached per size; shared across rebuilds, never disposed) ----------
 const texCache = {};
 function canvasTex(key, size, draw, srgb) {
-  if (texCache[key]) return texCache[key];
+  const k = BUD.texture, px = Math.max(16, Math.round(size * k));
+  const id = key + ':' + px;
+  if (texCache[id]) return texCache[id];
   const c = document.createElement('canvas');
-  c.width = c.height = size;
-  draw(c.getContext('2d'), size);
+  c.width = c.height = px;
+  const g = c.getContext('2d');
+  g.scale(px / size, px / size); // patterns are authored at `size`; drawn at the budget's resolution
+  draw(g, size);
   const t = new THREE.CanvasTexture(c);
   if (srgb) t.colorSpace = THREE.SRGBColorSpace;
   t.anisotropy = 4;
-  texCache[key] = t;
+  texCache[id] = t;
   return t;
 }
 function seededNoise(seed) {
@@ -137,24 +146,34 @@ function streetTexture() {
 
 // ---------- materials ----------
 function mat(color, opts) {
+  if (BUD.material === 'lambert') { // Low: Lambert, keeping colour, texture and glow
+    const o = opts || {};
+    return new THREE.MeshLambertMaterial({ color, map: o.map || null, emissive: o.emissive || 0x000000, emissiveIntensity: o.emissiveIntensity == null ? 1 : o.emissiveIntensity });
+  }
   return new THREE.MeshStandardMaterial(Object.assign({ color, roughness: 0.85, metalness: 0.05, envMapIntensity: 0.35 }, opts || {}));
 }
 // Glossy pieces (table tops, plates, ceramic): clearcoat over a satin base.
 function gloss(color, opts) {
+  if (BUD.material === 'lambert') return new THREE.MeshPhongMaterial({ color, specular: 0x404040, shininess: 50 });
+  if (BUD.material === 'standard') {
+    const o = Object.assign({}, opts || {}); delete o.clearcoat; delete o.clearcoatRoughness;
+    return new THREE.MeshStandardMaterial(Object.assign({ color, roughness: 0.4, metalness: 0.0, envMapIntensity: 0.5 }, o));
+  }
   return new THREE.MeshPhysicalMaterial(Object.assign({
     color, roughness: 0.45, metalness: 0.0, clearcoat: 0.7, clearcoatRoughness: 0.25, envMapIntensity: 0.5
   }, opts || {}));
 }
 function glow(color, intensity) {
+  if (BUD.material === 'lambert') return new THREE.MeshLambertMaterial({ color: 0x000000, emissive: color, emissiveIntensity: intensity });
   return new THREE.MeshStandardMaterial({ color: 0x000000, emissive: color, emissiveIntensity: intensity, roughness: 1 });
 }
 
 // --- procedural guest: rounded capsule body + head, colored by mood ---
 function buildGuest(color) {
   const g = new THREE.Group();
-  const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.16, 0.22, 4, 12), mat(color, { roughness: 0.6 }));
+  const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.16, 0.22, seg(4), seg(12)), mat(color, { roughness: 0.6 }));
   body.position.y = 0.28;
-  const head = new THREE.Mesh(new THREE.SphereGeometry(0.11, 14, 10), mat(0xf0d8b8, { roughness: 0.55 }));
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.11, seg(14), seg(10)), mat(0xf0d8b8, { roughness: 0.55 }));
   head.position.y = 0.56;
   g.add(body, head);
   g.userData.phase = Math.random() * Math.PI * 2; // cosmetic only
@@ -163,15 +182,15 @@ function buildGuest(color) {
 
 function buildWaiter(color, isPlayer) {
   const g = new THREE.Group();
-  const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.17, 0.3, 4, 12), mat(color, { roughness: 0.55 }));
+  const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.17, 0.3, seg(4), seg(12)), mat(color, { roughness: 0.55 }));
   body.position.y = 0.34;
-  const head = new THREE.Mesh(new THREE.SphereGeometry(0.12, 14, 10), mat(0xf0d8b8, { roughness: 0.55 }));
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.12, seg(14), seg(10)), mat(0xf0d8b8, { roughness: 0.55 }));
   head.position.y = 0.66;
   const apron = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.24, 0.05), mat(0xf4efe6, { roughness: 0.7 }));
   apron.position.set(0, 0.34, 0.15);
   g.add(body, head, apron);
   if (isPlayer) { // grounded selection marker ring under the player
-    const ring = new THREE.Mesh(new THREE.RingGeometry(0.24, 0.3, 32),
+    const ring = new THREE.Mesh(new THREE.RingGeometry(0.24, 0.3, seg(32)),
       new THREE.MeshBasicMaterial({ color: 0xffd27a, transparent: true, opacity: 0.9, side: THREE.DoubleSide }));
     ring.rotation.x = -Math.PI / 2; ring.position.y = 0.02;
     g.add(ring);
@@ -180,7 +199,7 @@ function buildWaiter(color, isPlayer) {
   // tray (visible dish count pucks added in sync)
   const tray = new THREE.Group();
   tray.position.set(0, 0.55, 0.2);
-  const plate = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, 0.02, 20), mat(0xc9c2b4, { roughness: 0.3, metalness: 0.6 }));
+  const plate = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, 0.02, seg(20)), mat(0xc9c2b4, { roughness: 0.3, metalness: 0.6 }));
   tray.add(plate);
   g.add(tray);
   g.userData.tray = tray;
@@ -189,25 +208,25 @@ function buildWaiter(color, isPlayer) {
 
 function buildTable(theme, detailed) {
   const g = new THREE.Group();
-  const top = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.36, 0.06, 24),
+  const top = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.36, 0.06, seg(24)),
     gloss(theme.table, detailed ? { map: woodTexture() } : null));
   top.position.y = 0.42;
-  const cloth = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 0.02, 24), mat(theme.cloth, { roughness: 0.95 }));
+  const cloth = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 0.02, seg(24)), mat(theme.cloth, { roughness: 0.95 }));
   cloth.position.y = 0.46;
-  const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.07, 0.42, 10), mat(theme.wood, detailed ? { map: woodTexture() } : null));
+  const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.07, 0.42, seg(10)), mat(theme.wood, detailed ? { map: woodTexture() } : null));
   leg.position.y = 0.21;
   g.add(top, cloth, leg);
   if (detailed) { // candle: wax stub + emissive flame (blooms; flickers when animated)
-    const wax = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.08, 10), mat(0xf3ead8, { roughness: 0.6 }));
+    const wax = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.08, seg(10)), mat(0xf3ead8, { roughness: 0.6 }));
     wax.position.y = 0.51;
-    const flame = new THREE.Mesh(new THREE.SphereGeometry(0.022, 8, 6), glow(0xffb45a, 3.2));
+    const flame = new THREE.Mesh(new THREE.SphereGeometry(0.022, seg(8), seg(6)), glow(0xffb45a, 3.2));
     flame.scale.set(1, 1.6, 1);
     flame.position.y = 0.575;
     g.add(wax, flame);
     g.userData.flame = flame;
   }
   // patience ring (hidden until a guest waits)
-  const ring = new THREE.Mesh(new THREE.RingGeometry(0.38, 0.44, 36),
+  const ring = new THREE.Mesh(new THREE.RingGeometry(0.38, 0.44, seg(36)),
     new THREE.MeshBasicMaterial({ color: 0xffb35c, transparent: true, opacity: 0.95, side: THREE.DoubleSide }));
   ring.rotation.x = -Math.PI / 2; ring.position.y = 0.03; ring.visible = false;
   g.add(ring);
@@ -219,15 +238,15 @@ function buildStove(theme, particlesHigh) {
   const g = new THREE.Group();
   const base = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.5, 0.7), mat(theme.metal, { metalness: 0.75, roughness: 0.32 }));
   base.position.y = 0.25;
-  const burner = new THREE.Mesh(new THREE.TorusGeometry(0.2, 0.025, 6, 24), glow(0xff6a2a, 0.15));
+  const burner = new THREE.Mesh(new THREE.TorusGeometry(0.2, 0.025, seg(6), seg(24)), glow(0xff6a2a, 0.15));
   burner.rotation.x = Math.PI / 2; burner.position.y = 0.505;
-  const pan = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.24, 0.1, 20), mat(0x2c2c30, { metalness: 0.8, roughness: 0.3 }));
+  const pan = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.24, 0.1, seg(20)), mat(0x2c2c30, { metalness: 0.8, roughness: 0.3 }));
   pan.position.y = 0.56;
   g.add(base, burner, pan);
   const puffs = [];
-  const n = particlesHigh ? 6 : 1;
+  const n = particlesHigh ? BUD.steam : 1;
   for (let i = 0; i < n; i++) {
-    const steam = new THREE.Mesh(new THREE.SphereGeometry(0.08, 10, 8),
+    const steam = new THREE.Mesh(new THREE.SphereGeometry(0.08, seg(10), seg(8)),
       new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.25, depthWrite: false }));
     steam.position.y = 0.75;
     steam.userData.offset = i / n;
@@ -260,6 +279,8 @@ const GradeShader = {
       gl_FragColor = vec4(c, src.a);
     }`
 };
+
+function budgetKey(r) { const b = r.budget || {}; return [b.material, b.segments, b.texture, b.steam].join('|'); }
 
 function api(container, callbacks) {
   let renderer = makeRenderer(callbacks.antialias !== false);
@@ -322,7 +343,7 @@ function api(container, callbacks) {
     theme = themeIn;
     reducedMotion = !!(settings && settings.reducedMotion);
     const detailed = q.detail === 'detailed';
-    builtWith = { detail: q.detail, particles: q.particles };
+    builtWith = { detail: q.detail, particles: q.particles, budget: budgetKey(q) };
     if (world) { scene.remove(world); disposeGroup(world); }
     pickMeshes = []; tableViews = []; stoveViews = []; waiterViews = []; flickers = [];
     guestViews.forEach(v => disposeGroup(v)); guestViews.clear();
@@ -397,7 +418,7 @@ function api(container, callbacks) {
         const y = 1.35 - Math.sin(t * Math.PI * 3) ** 2 * 0.14;
         pts.push(new THREE.Vector3(x, y + 0.04, top.position.z));
         if (i > 0 && i < n) {
-          const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.06, 10, 8), bulbMat.clone());
+          const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.06, seg(10), seg(8)), bulbMat.clone());
           bulb.position.set(x, y, top.position.z);
           bulb.userData.base = 1.9; bulb.userData.phase = i * 1.7;
           world.add(bulb);
@@ -408,7 +429,7 @@ function api(container, callbacks) {
       world.add(cord);
       // posts holding the festoon at both ends
       [pts[0], pts[pts.length - 1]].forEach(p => {
-        const post = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.5, 8), mat(0x2a2320, { metalness: 0.6, roughness: 0.4 }));
+        const post = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.5, seg(8)), mat(0x2a2320, { metalness: 0.6, roughness: 0.4 }));
         post.position.set(p.x, 1.13, p.z);
         world.add(post);
       });
@@ -421,7 +442,7 @@ function api(container, callbacks) {
     }
 
     // decorative props (seeded decor stream; never affects rules)
-    const propGeo = new THREE.CylinderGeometry(0.09, 0.11, 0.5, 10);
+    const propGeo = new THREE.CylinderGeometry(0.09, 0.11, 0.5, seg(10));
     const props = new THREE.InstancedMesh(propGeo, mat(theme.wood, detailed ? { map: woodTexture() } : null), 6);
     for (let i = 0; i < 6; i++) {
       const px = corners[0].x - TILE * (0.9 + decor.next() * 0.6);
@@ -700,7 +721,7 @@ function api(container, callbacks) {
     // tray pucks = carried dishes (glossy ceramic)
     const tray = v.userData.tray;
     while (tray.children.length - 1 < w.carrying) {
-      const puck = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.03, 16), gloss(0xf0e6d2, { roughness: 0.3, clearcoat: 0.9 }));
+      const puck = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.03, seg(16)), gloss(0xf0e6d2, { roughness: 0.3, clearcoat: 0.9 }));
       puck.position.y = 0.02 + 0.035 * (tray.children.length - 1);
       puck.castShadow = true;
       tray.add(puck);
@@ -785,8 +806,11 @@ function api(container, callbacks) {
    * board must be rebuilt (surface detail / particle count changed). */
   function setGraphics(resolved, settings) {
     q = resolved;
+    BUD = q.budget || BUD;
     reducedMotion = !!(settings && settings.reducedMotion);
-    if (!q.post && renderer.userData.antialias !== (q.antialias === 'msaa')) swapRenderer(q.antialias === 'msaa');
+    // Canvas MSAA only when rendering straight to the canvas; a post chain has its own anti-aliasing.
+    const canvasAA = !q.post && q.antialias === 'msaa';
+    if (renderer.userData.antialias !== canvasAA) swapRenderer(canvasAA);
     const sm = SHADOW_MAP[q.shadows];
     renderer.shadowMap.enabled = sm > 0;
     key.castShadow = sm > 0;
@@ -800,12 +824,12 @@ function api(container, callbacks) {
     adaptiveScale = 1; frames = [];
     postKey = null;
     dirty = true;
-    return { rebuild: !!(world && builtWith && (builtWith.detail !== q.detail || builtWith.particles !== q.particles)) };
+    return { rebuild: !!(world && builtWith && (builtWith.detail !== q.detail || builtWith.particles !== q.particles || builtWith.budget !== budgetKey(q))) };
   }
 
   function currentPixels() {
     const w = container.clientWidth || 1, h = container.clientHeight || 1;
-    const ratio = Math.min(window.devicePixelRatio || 1, 2) * q.scale * adaptiveScale;
+    const ratio = Math.min(window.devicePixelRatio || 1, BUD.maxDpr) * q.scale * adaptiveScale;
     return [Math.round(w * ratio), Math.round(h * ratio)];
   }
 
@@ -839,7 +863,10 @@ function api(container, callbacks) {
         c.addPass(ao);
       }
       // High threshold: only emissive lamps, candles, burners and the door glow bloom.
-      if (q.bloom === 'on') c.addPass(new UnrealBloomPass(new THREE.Vector2(w, h), 0.55, 0.3, 0.92));
+      if (q.bloom === 'on') { // bloom at the budget's fraction of the canvas resolution
+        const br = BUD.bloomRes;
+        c.addPass(new UnrealBloomPass(new THREE.Vector2(Math.round(pw * br), Math.round(ph * br)), 0.55, 0.3, 0.92));
+      }
       c.addPass(new OutputPass());
       if (q.grade === 'on') c.addPass(new ShaderPass(GradeShader));
       if (q.antialias === 'smaa') c.addPass(new SMAAPass(pw, ph));
@@ -897,7 +924,7 @@ function api(container, callbacks) {
       if (shakeT <= 0) frameCamera();
     }
     const w = container.clientWidth || 1, h = container.clientHeight || 1;
-    const ratio = Math.min(window.devicePixelRatio || 1, 2) * q.scale * adaptiveScale;
+    const ratio = Math.min(window.devicePixelRatio || 1, BUD.maxDpr) * q.scale * adaptiveScale;
     if (w !== size[0] || h !== size[1] || ratio !== pixelRatio) {
       const moved = w !== size[0] || h !== size[1];
       pixelRatio = ratio;

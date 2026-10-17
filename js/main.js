@@ -5,7 +5,7 @@
  * Own-server use: only GET /api/v1/time, and only when signed in.
  */
 import * as BBRender from './render.js';
-import { resolve as resolveGfx, detectPreset } from './gfx.js';
+import { resolve as resolveGfx, detectLevel, presetForLevel } from './gfx.js';
 import { buildGraphicsSection } from './gfx-panel.js';
 import { accountStrings } from './gfx-strings.js';
 
@@ -194,11 +194,22 @@ import { accountStrings } from './gfx-strings.js';
     try { coarse = window.matchMedia('(pointer: coarse)').matches; } catch (e) {}
     return coarse || /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
   }
-  function detectedPreset() {
+  // StarHermit hardware level 0–20 (gpu-level.js) → Auto preset: Low 0, Balanced 4, High 10, Ultra 17.
+  var gpuLevel = null;
+  function hardwareLevel() {
+    if (gpuLevel != null) return gpuLevel;
+    try {
+      if (window.StarHermitGpu) {
+        var info = window.StarHermitGpu.info();
+        if (gpuName == null) gpuName = info.gpu || '';
+        return (gpuLevel = info.level);
+      }
+    } catch (e) { /* fall back below */ }
     if (gpuName == null) gpuName = BBRender.probeGpu();
-    return detectPreset(gpuName, isMobile());
+    return (gpuLevel = detectLevel(gpuName, { mobile: isMobile() }));
   }
-  function gfxResolved() { return resolveGfx(settings.gfx, detectedPreset()); }
+  function detectedPreset() { return presetForLevel(hardwareLevel()); }
+  function gfxResolved() { return resolveGfx(settings.gfx, detectedPreset(), hardwareLevel()); }
   function fpsMeter(on) {
     var m = document.getElementById('fps-meter');
     if (on && !m) {
@@ -222,11 +233,11 @@ import { accountStrings } from './gfx-strings.js';
       view.build(game.state, C.THEMES[settings.theme] || C.THEMES.ember, game.cfg.seed, settings);
   }
   function graphicsInfo() {
-    if (view) return view.graphicsInfo();
+    if (view) return Object.assign({ level: hardwareLevel() }, view.graphicsInfo());
     var r = gfxResolved();
-    var ratio = Math.min(window.devicePixelRatio || 1, 2) * r.scale;
+    var ratio = Math.min(window.devicePixelRatio || 1, r.budget.maxDpr) * r.scale;
     var pf = playfield || document.body;
-    return { gpu: gpuName, pixels: [Math.round((pf.clientWidth || window.innerWidth) * ratio), Math.round((pf.clientHeight || window.innerHeight) * ratio)], postFailed: false };
+    return { gpu: gpuName, level: hardwareLevel(), pixels: [Math.round((pf.clientWidth || window.innerWidth) * ratio), Math.round((pf.clientHeight || window.innerHeight) * ratio)], postFailed: false };
   }
 
   // ---------- session ----------

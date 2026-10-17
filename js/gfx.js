@@ -31,22 +31,59 @@ export const SHADOW_MAP = { off: 0, low: 1024, medium: 2048, high: 4096 };
 
 export const DEFAULTS = { preset: 'auto', render_scale: 1, adaptive: true, show_fps: false };
 
-/** Best preset for this GPU (unmasked renderer string). Touch/mobile devices cap at balanced. */
+// StarHermit hardware level (0–20, gpu-level.js) at which Auto starts choosing each preset.
+export const LEVELS = { low: 0, balanced: 4, high: 10, ultra: 17 };
+
+// Per-preset asset and effect budgets, each tuned to hold 60 FPS on the weakest GPU Auto gives the
+// preset (Low: level 0 phones / Intel UHD; Balanced: level 4 Iris Xe; High: level 10 GTX 1070;
+// Ultra: level 17 RTX 4080). Gameplay is identical on every preset.
+//   maxDpr    — device-pixel-ratio cap
+//   material  — 'lambert' (Lambert surfaces, Phong gloss), 'standard' (PBR, no clearcoat) or
+//               'physical' (clearcoat table tops, plates and counter)
+//   segments  — multiplier on every curved mesh's segment counts (guests, tables, plates, stove, lamps)
+//   texture   — multiplier on the procedural tile / wood / plaster / street texture sizes
+//   steam     — steam puffs per stove with Particles: high (Particles: low keeps one), scaled by level
+//   bloomRes  — bloom resolution as a fraction of the canvas
+export const BUDGETS = {
+  low: { maxDpr: 1, material: 'lambert', segments: 0.5, texture: 0.5, steam: 2, bloomRes: 0.5 },
+  balanced: { maxDpr: 1.5, material: 'standard', segments: 0.75, texture: 1, steam: 3, bloomRes: 0.5 },
+  high: { maxDpr: 2, material: 'physical', segments: 1, texture: 1, steam: 6, bloomRes: 0.75 },
+  ultra: { maxDpr: 2, material: 'physical', segments: 1.5, texture: 2, steam: 10, bloomRes: 1 }
+};
+
+const gpuApi = () => globalThis.StarHermitGpu;
+
+/** Hardware level 0–20 for a renderer string (system: detectSystem() fields, e.g. { mobile }). */
+export function detectLevel(gpu, system) {
+  const G = gpuApi();
+  return G ? G.detectLevel(Object.assign({ webgl: true, webgl2: true }, system || {}, { gpu: String(gpu || '') })) : 0;
+}
+
+/** Auto preset for a hardware level: Low 0, Balanced 4, High 10, Ultra 17. */
+export function presetForLevel(level) {
+  const G = gpuApi();
+  return G ? G.presetForLevel(level, LEVELS) : (PRESETS.filter(p => LEVELS[p] <= level).pop() || 'low');
+}
+
+/** Best preset for this GPU (hardware level → preset); `mobile` caps it at Balanced. */
 export function detectPreset(gpu, mobile) {
-  const g = String(gpu || '').toLowerCase();
-  let p;
-  if (/swiftshader|llvmpipe|softpipe|software|basic render|microsoft basic/.test(g)) p = 'low';
-  else if (/nvidia|geforce|rtx|gtx|quadro|radeon rx|radeon pro|amd radeon(?!.*graphics)|apple m\d/.test(g)) p = 'high';
-  else p = 'balanced';
-  if (mobile && p === 'high') p = 'balanced';
-  return p;
+  return presetForLevel(detectLevel(gpu, { mobile: !!mobile }));
+}
+
+/** The preset's budget; steam puffs scale by the hardware level within the preset (≤ 2×). */
+export function budget(preset, level) {
+  const b = BUDGETS[preset] || BUDGETS.balanced;
+  const G = gpuApi(), floor = LEVELS[preset] || 0;
+  const lv = Number.isFinite(level) ? level : floor;
+  const k = G ? Math.min(2, G.scaleBudget(1, lv, floor)) : 1;
+  return Object.assign({}, b, { steam: Math.max(1, Math.round(b.steam * k)) });
 }
 
 /**
  * Resolve saved settings into concrete tiers.
  * `saved`: { preset: 'auto'|preset, render_scale, adaptive, show_fps, <category>: 'preset'|tier }.
  */
-export function resolve(saved, detected) {
+export function resolve(saved, detected, level) {
   const s = saved || {};
   const auto = !PRESETS.includes(s.preset);
   const preset = auto ? (PRESETS.includes(detected) ? detected : 'balanced') : s.preset;
@@ -56,6 +93,7 @@ export function resolve(saved, detected) {
   for (const cat of Object.keys(CATEGORIES)) {
     out[cat] = CATEGORIES[cat].includes(s[cat]) ? s[cat] : row[cat];
   }
+  out.budget = budget(preset, level);
   out.adaptive = s.adaptive !== false;
   out.showFps = !!s.show_fps;
   // Post-processing runs only when something needs it; otherwise the canvas renders directly.

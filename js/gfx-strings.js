@@ -11,7 +11,7 @@ const EN = {
   tier: { off: 'Off', on: 'On', low: 'Low', medium: 'Medium', high: 'High', fxaa: 'FXAA', smaa: 'SMAA', msaa: 'MSAA', plain: 'Plain', detailed: 'Detailed', static: 'Static', animated: 'Animated' },
   adaptive: 'Adaptive resolution', showFps: 'Show frame rate',
   postUnavailable: 'Post-processing is unavailable on this device; the bistro renders without it.',
-  unknownGpu: 'unknown GPU',
+  unknownGpu: 'unknown GPU', level: 'Level {level}',
   words: { noShadows: 'no shadows', shadows: 'shadows', ao: 'ambient occlusion', aoHigh: 'full ambient occlusion', bloom: 'bloom', reflections: 'reflections', noAA: 'no anti-aliasing' }
 };
 
@@ -28,7 +28,7 @@ const STRINGS = {
     tier: { off: 'No', on: 'Sí', low: 'Baja', medium: 'Media', high: 'Alta', fxaa: 'FXAA', smaa: 'SMAA', msaa: 'MSAA', plain: 'Simple', detailed: 'Detallado', static: 'Estática', animated: 'Animada' },
     adaptive: 'Resolución adaptativa', showFps: 'Mostrar cuadros por segundo',
     postUnavailable: 'El posprocesamiento no está disponible en este dispositivo; el bistró se muestra sin él.',
-    unknownGpu: 'GPU desconocida',
+    unknownGpu: 'GPU desconocida', level: 'Nivel {level}',
     words: { noShadows: 'sin sombras', shadows: 'sombras', ao: 'oclusión ambiental', aoHigh: 'oclusión ambiental completa', bloom: 'resplandor', reflections: 'reflejos', noAA: 'sin antialiasing' }
   },
   'es-ES': {
@@ -39,7 +39,7 @@ const STRINGS = {
     tier: { off: 'No', on: 'Sí', low: 'Baja', medium: 'Media', high: 'Alta', fxaa: 'FXAA', smaa: 'SMAA', msaa: 'MSAA', plain: 'Simple', detailed: 'Detallado', static: 'Estática', animated: 'Animada' },
     adaptive: 'Resolución adaptativa', showFps: 'Mostrar fotogramas por segundo',
     postUnavailable: 'El posprocesado no está disponible en este dispositivo; el bistró se muestra sin él.',
-    unknownGpu: 'GPU desconocida',
+    unknownGpu: 'GPU desconocida', level: 'Nivel {level}',
     words: { noShadows: 'sin sombras', shadows: 'sombras', ao: 'oclusión ambiental', aoHigh: 'oclusión ambiental completa', bloom: 'resplandor', reflections: 'reflejos', noAA: 'sin suavizado' }
   },
   'de-DE': {
@@ -50,7 +50,7 @@ const STRINGS = {
     tier: { off: 'Aus', on: 'An', low: 'Niedrig', medium: 'Mittel', high: 'Hoch', fxaa: 'FXAA', smaa: 'SMAA', msaa: 'MSAA', plain: 'Schlicht', detailed: 'Detailliert', static: 'Statisch', animated: 'Animiert' },
     adaptive: 'Adaptive Auflösung', showFps: 'Bildrate anzeigen',
     postUnavailable: 'Nachbearbeitung ist auf diesem Gerät nicht verfügbar; das Bistro wird ohne sie dargestellt.',
-    unknownGpu: 'unbekannte GPU',
+    unknownGpu: 'unbekannte GPU', level: 'Stufe {level}',
     words: { noShadows: 'keine Schatten', shadows: 'Schatten', ao: 'Umgebungsverdeckung', aoHigh: 'volle Umgebungsverdeckung', bloom: 'Lichtschein', reflections: 'Spiegelungen', noAA: 'keine Kantenglättung' }
   },
   'fr-FR': {
@@ -61,7 +61,7 @@ const STRINGS = {
     tier: { off: 'Désactivé', on: 'Activé', low: 'Basse', medium: 'Moyenne', high: 'Haute', fxaa: 'FXAA', smaa: 'SMAA', msaa: 'MSAA', plain: 'Simple', detailed: 'Détaillé', static: 'Statique', animated: 'Animée' },
     adaptive: 'Résolution adaptative', showFps: 'Afficher les images par seconde',
     postUnavailable: 'Le post-traitement est indisponible sur cet appareil ; le bistrot s’affiche sans.',
-    unknownGpu: 'GPU inconnu',
+    unknownGpu: 'GPU inconnu', level: 'Niveau {level}',
     words: { noShadows: 'sans ombres', shadows: 'ombres', ao: 'occlusion ambiante', aoHigh: 'occlusion ambiante complète', bloom: 'halo', reflections: 'reflets', noAA: 'sans anticrénelage' }
   },
   'fr-CA': {
@@ -72,7 +72,7 @@ const STRINGS = {
     tier: { off: 'Désactivé', on: 'Activé', low: 'Basse', medium: 'Moyenne', high: 'Élevée', fxaa: 'FXAA', smaa: 'SMAA', msaa: 'MSAA', plain: 'Simple', detailed: 'Détaillé', static: 'Statique', animated: 'Animée' },
     adaptive: 'Résolution adaptative', showFps: 'Afficher la fréquence d’images',
     postUnavailable: 'Le post-traitement n’est pas offert sur cet appareil; le bistro s’affiche sans.',
-    unknownGpu: 'GPU inconnu',
+    unknownGpu: 'GPU inconnu', level: 'Niveau {level}',
     words: { noShadows: 'sans ombres', shadows: 'ombres', ao: 'occlusion ambiante', aoHigh: 'occlusion ambiante complète', bloom: 'halo', reflections: 'reflets', noAA: 'sans anticrénelage' }
   },
   'pt-BR': {
@@ -83,7 +83,7 @@ const STRINGS = {
     tier: { off: 'Desligado', on: 'Ligado', low: 'Baixa', medium: 'Média', high: 'Alta', fxaa: 'FXAA', smaa: 'SMAA', msaa: 'MSAA', plain: 'Simples', detailed: 'Detalhado', static: 'Estática', animated: 'Animada' },
     adaptive: 'Resolução adaptativa', showFps: 'Mostrar taxa de quadros',
     postUnavailable: 'O pós-processamento não está disponível neste dispositivo; o bistrô é exibido sem ele.',
-    unknownGpu: 'GPU desconhecida',
+    unknownGpu: 'GPU desconhecida', level: 'Nível {level}',
     words: { noShadows: 'sem sombras', shadows: 'sombras', ao: 'oclusão ambiente', aoHigh: 'oclusão ambiente completa', bloom: 'brilho', reflections: 'reflexos', noAA: 'sem anti-serrilhado' }
   },
   'it-IT': {
@@ -94,7 +94,7 @@ const STRINGS = {
     tier: { off: 'No', on: 'Sì', low: 'Bassa', medium: 'Media', high: 'Alta', fxaa: 'FXAA', smaa: 'SMAA', msaa: 'MSAA', plain: 'Semplice', detailed: 'Dettagliato', static: 'Statica', animated: 'Animata' },
     adaptive: 'Risoluzione adattiva', showFps: 'Mostra frequenza fotogrammi',
     postUnavailable: 'La post-elaborazione non è disponibile su questo dispositivo; il bistrot viene mostrato senza.',
-    unknownGpu: 'GPU sconosciuta',
+    unknownGpu: 'GPU sconosciuta', level: 'Livello {level}',
     words: { noShadows: 'senza ombre', shadows: 'ombre', ao: 'occlusione ambientale', aoHigh: 'occlusione ambientale completa', bloom: 'bagliore', reflections: 'riflessi', noAA: 'senza antialiasing' }
   }
 };
