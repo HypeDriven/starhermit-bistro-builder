@@ -300,9 +300,21 @@
     return { label: t('st.free'), cls: 'free' };
   }
 
+  // A press inside a panel holds its rebuild until the release: a click only
+  // fires when press and release land on the same element, so a tick rebuild
+  // in between lost it. The first tick after the release rebuilds the panel.
+  var pressedEl = null;
+  if (root.document) {
+    root.document.addEventListener('pointerdown', function (e) { pressedEl = e.target; }, true);
+    ['pointerup', 'pointercancel'].forEach(function (name) {
+      root.document.addEventListener(name, function () { pressedEl = null; }, true);
+    });
+  }
+
   // Panels rebuild from state every tick; without this a keyboard user loses
   // focus mid-Tab before they can activate a station or upgrade button.
   function rebuildKeepingFocus(container, rebuild) {
+    if (pressedEl && container.contains(pressedEl)) return;
     var active = document.activeElement;
     var key = active && container.contains(active) ? active.getAttribute('data-fkey') : null;
     rebuild();

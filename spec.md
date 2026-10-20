@@ -275,7 +275,7 @@ Nine locales ship for all player-facing text: **en-US, en-GB, es-419, es-ES, de-
 
 ## 11. Accessibility
 
-- **Keyboard-only path:** Tab reaches every control; the station mirror and upgrade panel rebuild each tick but restore focus by `data-fkey` (`ui.js#rebuildKeepingFocus`); number keys serve tables; `Esc` closes overlays; each screen focuses its first control on open. No keyboard trap: every dialog has a Back/Resume/Home button.
+- **Keyboard-only path:** Tab reaches every control; the station mirror and upgrade panel rebuild each tick but restore focus by `data-fkey` (`ui.js#rebuildKeepingFocus`), and never while a pointer is pressed inside them (the rebuild waits for the release, so every click lands on the button it was pressed on); number keys serve tables; `Esc` closes overlays; each screen focuses its first control on open. No keyboard trap: every dialog has a Back/Resume/Home button.
 - **Screen reader:** `aria-live="polite"` region announces round start, lesson steps, each serve with its payout, angry departures, urgency warnings and every rejected command; rails carry `aria-label`s; the canvas section explains that the stations panel is the text version; journey cells announce stage, name and stars.
 - **Captions** for every sound event (see §9); no information is audio-only — each cue has a ring, chip, toast or mirror row.
 - **Contrast:** ink `#f2e9dd` on `#14100d` (≈14:1); accent-on-dark buttons use `#1c1206` text; High contrast mode goes to pure black/white with a cyan focus ring; the 3 px `:focus-visible` outline uses `--focus`.
