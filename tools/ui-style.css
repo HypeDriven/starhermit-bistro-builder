@@ -1,0 +1,144 @@
+/* Bistro Builder — the browser client's style sheet (css/game.css), kept for
+ * the engine port and rewritten class-based for `starhermit css` (`npm run
+ * css` converts it into assets/ui-style.json, which native/style.ts
+ * registers): ids, element selectors (h1, h2, h3, strong, li, table cells)
+ * and compound classes (.btn.primary, .station.urgent, .level-cell.locked)
+ * became classes of their own; the media queries, safe-area insets, the
+ * ui-scale zoom, the body classes (high contrast, large text, reduced
+ * motion, left-handed, board mirror), the graphics panel, the fps meter and
+ * the drawer transitions are gone: the runtime gives interface size, text
+ * size, high contrast, reduced motion and graphics, native/style.ts swaps the
+ * palette tokens (high contrast, high visibility), and native/screens.ts
+ * picks the compact layouts (drawers, thumb tray, side column) by window
+ * size. */
+* { box-sizing: border-box; }
+:root {
+  --bg: #14100d;
+  --panel: #211a15;
+  --panel-2: #2b221b;
+  --ink: #f2e9dd;
+  --ink-dim: #b8a894;
+  --accent: #e8a54b;
+  --danger: #e0574d;
+  --ok: #7fd08a;
+  --focus: #ffd27a;
+  --on-accent: #1c1206;
+  --hover: #3a2e25;
+  --line: #0a0807;
+  font-size: 16px;
+}
+
+/* ---------- generic ---------- */
+.btn {
+  min-height: 44px; padding: 0.55em 1em;
+  background: var(--panel-2); color: var(--ink);
+  border: 1px solid var(--line); border-radius: 10px; text-align: center;
+}
+.btn:hover { background: var(--hover); }
+.btn:disabled { opacity: 0.45; }
+.btn:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+.btn-primary { background: var(--accent); color: var(--on-accent); font-weight: 700; }
+.btn-primary:hover { background: #f2b866; }
+.btn-big { font-size: 1.15em; padding: 0.7em 1.4em; }
+.btn-small { min-height: 36px; padding: 0.3em 0.7em; font-size: 0.9em; }
+.btn-icon { min-width: 44px; padding: 0.55em 0.7em; }
+.btn-hud { box-shadow: 0 2px 8px rgba(0, 0, 0, 0.67); }
+.btn-upgrade { padding: 0.45em 0.3em; font-size: 0.85em; }
+.cost { font-size: 0.85em; font-weight: 700; color: var(--ink); opacity: 0.85; }
+.mini { font-size: 0.82em; color: var(--ink-dim); }
+.text { color: var(--ink); }
+.card {
+  text-align: left; background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px;
+  padding: 0.8em 1em; color: var(--ink); min-height: 44px;
+}
+.card:hover { background: var(--hover); }
+.card:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+.card-title { font-size: 1.05em; font-weight: 700; color: var(--ink); }
+.card-desc { color: var(--ink-dim); font-size: 0.88em; }
+.card-meta { font-size: 0.8em; color: var(--accent); }
+.fact { padding: 0.3em 0; border-bottom: 1px dashed rgba(255, 255, 255, 0.09); }
+.fact-key { font-weight: 700; color: var(--ink); }
+
+/* ---------- header status bar ---------- */
+.topbar { background: var(--panel); border-bottom: 1px solid var(--line); padding: 0.4em 0.8em; }
+.brand { font-size: 1.05em; font-weight: 700; letter-spacing: 0.04em; color: var(--ink); }
+.brand-sub { color: var(--accent); font-size: 0.79em; }
+.stat-chip { background: var(--panel-2); border-radius: 999px; padding: 0.2em 0.8em; }
+.chip-label { font-size: 0.92em; color: var(--ink); }
+.chip-value { font-size: 0.92em; font-weight: 700; color: var(--accent); font-variant-numeric: tabular-nums; }
+.chip-ok { font-size: 0.92em; font-weight: 700; color: var(--ok); font-variant-numeric: tabular-nums; }
+.chip-low { font-size: 0.92em; font-weight: 700; color: var(--danger); font-variant-numeric: tabular-nums; }
+
+/* ---------- rails ---------- */
+.rail { background: var(--panel); padding: 0.8em; border-left: 1px solid var(--line); border-right: 1px solid var(--line); }
+.rail-drawer { background: var(--panel); padding: 0.8em; box-shadow: 0 0 24px rgba(0, 0, 0, 0.67); }
+.rail-h { margin: 0.2em 0; font-size: 0.95em; font-weight: 700; color: var(--accent); letter-spacing: 0.05em; }
+.objective { background: var(--panel-2); border-radius: 10px; padding: 0.6em 0.8em; }
+.objective-big { font-size: 1.3em; font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums; }
+.progress-track { height: 8px; background: rgba(0, 0, 0, 0.4); border-radius: 999px; }
+.progress-fill { height: 8px; background: var(--accent); border-radius: 999px; }
+.hint-line { font-size: 0.88em; color: var(--ink-dim); }
+.lesson-step { background: rgba(0, 0, 0, 0.2); border-left: 3px solid var(--accent); padding: 0.5em 0.7em; border-radius: 6px; }
+.lesson-strong { font-size: 0.9em; font-weight: 700; color: var(--ink); }
+.lesson-text { font-size: 0.9em; color: var(--ink); }
+
+.station { background: var(--panel-2); border-radius: 8px; padding: 0.35em 0.6em; border-left: 4px solid var(--panel-2); }
+.station-waiting { background: var(--panel-2); border-radius: 8px; padding: 0.35em 0.6em; border-left: 4px solid var(--accent); }
+.station-urgent { background: var(--panel-2); border-radius: 8px; padding: 0.35em 0.6em; border-left: 4px solid var(--danger); }
+.station-eating { background: var(--panel-2); border-radius: 8px; padding: 0.35em 0.6em; border-left: 4px solid var(--ok); }
+.station-free { background: var(--panel-2); border-radius: 8px; padding: 0.35em 0.6em; border-left: 4px solid var(--panel-2); opacity: 0.65; }
+.station-label { font-size: 0.9em; color: var(--ink); }
+.station-label-urgent { font-size: 0.9em; color: var(--danger); font-weight: 700; }
+.mirror-tray { font-size: 0.9em; font-weight: 700; color: var(--ink); }
+
+/* ---------- screens / overlays ---------- */
+.screen { background: rgba(13, 10, 8, 0.93); padding: 1.2em; }
+.screen-h { font-size: 1.5em; font-weight: 700; color: var(--accent); }
+.screen-h3 { font-size: 1.17em; font-weight: 700; color: var(--accent); }
+.logo { font-size: 3.4em; font-weight: 700; color: var(--accent); letter-spacing: 0.03em; }
+.logo-compact { font-size: 2em; }
+.tagline { color: var(--ink-dim); }
+.key-art { border-radius: 10px; border: 1px solid var(--line); box-shadow: 0 8px 28px rgba(0, 0, 0, 0.67); }
+.result-art { border-radius: 10px; border: 1px solid var(--line); }
+.level-cell {
+  border-radius: 10px; border: 1px solid var(--line);
+  background: var(--panel-2); color: var(--ink); padding: 0.2em;
+}
+.level-cell:hover { background: var(--hover); }
+.level-cell:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+.level-cell:disabled { opacity: 0.35; }
+.level-mastery { border-color: var(--accent); }
+.level-num { font-weight: 700; font-size: 1.1em; color: var(--ink); }
+.level-stars { color: var(--accent); font-size: 0.75em; letter-spacing: 0.1em; }
+
+.setting-row { padding: 0.5em 0; border-bottom: 1px dashed rgba(255, 255, 255, 0.08); min-height: 44px; }
+.setting-label { color: var(--ink); }
+
+.help-card { background: var(--panel-2); border-radius: 10px; padding: 0.7em 1em; }
+.help-h { font-size: 1.17em; font-weight: 700; color: var(--accent); }
+.help-p { color: var(--ink); font-size: 0.92em; }
+
+.lb-row { border-bottom: 1px solid rgba(255, 255, 255, 0.07); }
+.lb-th { padding: 0.35em 0.5em; font-weight: 700; color: var(--ink); }
+.lb-td { padding: 0.35em 0.5em; color: var(--ink); font-variant-numeric: tabular-nums; }
+.lb-you { padding: 0.35em 0.5em; color: var(--accent); font-weight: 700; font-variant-numeric: tabular-nums; }
+.res-row { border-bottom: 1px solid rgba(255, 255, 255, 0.07); }
+.res-td { padding: 0.4em 0.5em; color: var(--ink); }
+.res-mini { padding: 0.4em 0.5em; font-size: 0.82em; color: var(--ink-dim); }
+.res-pts { padding: 0.4em 0.5em; color: var(--ink); font-variant-numeric: tabular-nums; text-align: right; }
+.res-total { padding: 0.4em 0.5em; font-weight: 700; font-size: 1.15em; color: var(--accent); font-variant-numeric: tabular-nums; }
+.ach { padding: 0.4em 0; border-bottom: 1px dashed rgba(255, 255, 255, 0.08); }
+.ach-locked { padding: 0.4em 0; border-bottom: 1px dashed rgba(255, 255, 255, 0.08); opacity: 0.55; }
+.ach-name { font-weight: 700; color: var(--ink); }
+.outcome-win { font-size: 1.6em; font-weight: 700; color: var(--ok); }
+.outcome-lose { font-size: 1.6em; font-weight: 700; color: var(--danger); }
+
+/* ---------- in-play overlay ---------- */
+.banner {
+  background: rgba(0, 0, 0, 0.8); color: var(--ink);
+  padding: 0.5em 1.2em; border-radius: 999px; font-size: 1.3em; font-weight: 700; text-align: center;
+}
+.toast { background: rgba(0, 0, 0, 0.87); border-radius: 8px; padding: 0.5em 1em; font-size: 0.9em; color: var(--ink); text-align: center; }
+.toast-invalid { background: rgba(0, 0, 0, 0.87); border-radius: 8px; padding: 0.5em 1em; font-size: 0.9em; color: var(--danger); text-align: center; }
+.caption-line { background: rgba(0, 0, 0, 0.67); border-radius: 6px; padding: 0.2em 0.7em; font-size: 0.8em; color: var(--ink-dim); }
+.notice { color: var(--ink-dim); text-align: center; }

@@ -1,0 +1,46 @@
+# Learn: lesson 1 (Serve a guest) completed with the table 1 key — the
+# lesson step in the Objective drawer, the bell, "Lesson complete!" — then
+# the results card, Play again, and lesson 2 (Stock up) through the station
+# panel's Pick up and Serve buttons.
+until 300 ▶ Play
+frames 5
+click ▶ Play
+until 60 Choose a mode
+frames 5
+save modes
+click Learn
+until 60 Serve a guest
+frames 5
+save learn
+click Serve a guest
+frames 170
+click Objective
+until 30 Serve the waiting guest.
+frames 5
+save lesson-step
+key Digit1 2
+until 400 Total
+expect Lesson complete!
+frames 150
+save lesson-results
+frames 5
+click Home
+until 60 ▶ Play
+frames 5
+click ▶ Play
+until 60 Learn
+frames 5
+click Learn
+until 60 Stock up
+frames 5
+click Stock up
+frames 170
+click Stations
+until 30 Kitchen — 1 dish(es) ready
+frames 5
+save stations
+click Pick up
+until 200 Tray: 1/2
+frames 5
+click Serve
+until 400 Total

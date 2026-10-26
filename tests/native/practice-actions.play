@@ -1,0 +1,65 @@
+# Practice (calm service): the HUD actions and every in-round overlay — the
+# station drawer's Serve, the tray upgrade from the upgrade grid, Hint,
+# Speed, Rewind, the camera key, pause → Settings (captions on) → Escape
+# back to the service → pause → Help → Escape, then the pause menu's Leave service to the results.
+until 300 ▶ Play
+frames 5
+click ▶ Play
+until 60 Practice
+frames 5
+click Practice
+until 60 Calm service
+frames 5
+save practice
+click Calm service
+frames 170
+click Stations
+until 900 Waiting
+frames 5
+save drawer
+click Serve
+frames 60
+click Bigger tray
+until 30 Bigger tray
+frames 5
+key KeyH 2
+frames 5
+save hint
+key KeyF 2
+until 30 Speed 2×
+frames 60
+key KeyF 2
+frames 5
+key KeyU 2
+frames 5
+key KeyC 2
+frames 5
+key KeyP 2
+until 60 Leave service
+frames 5
+click Settings
+until 60 Captions for sound cues
+frames 5
+click Captions for sound cues
+frames 5
+save settings
+key Escape 2
+until 60 Pause
+frames 30
+key KeyP 2
+until 60 Leave service
+frames 5
+click Help
+until 60 How to play
+frames 5
+save help
+key Escape 2
+frames 120
+save captions
+key Escape 2
+until 60 Leave service
+frames 5
+click Leave service
+until 200 Service over — goal missed.
+frames 5
+save practice-results

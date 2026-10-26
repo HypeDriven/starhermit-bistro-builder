@@ -263,11 +263,11 @@ test('server: time, static files, replay-validated scores, rejection of cheats',
 
     const idx = await fetch(base + '/index.html');
     assert.strictEqual(idx.status, 200);
-    assert.ok((await idx.text()).includes('Bistro Builder'));
+    assert.ok((await idx.text()).includes('starhermit'));
     const rulesJs = await fetch(base + '/js/rules.js');
     assert.strictEqual(rulesJs.status, 200);
-    const three = await fetch(base + '/vendor/three.module.min.js');
-    assert.strictEqual(three.status, 200);
+    const entry = await fetch(base + '/native/main.ts');
+    assert.strictEqual(entry.status, 200);
     assert.strictEqual((await fetch(base + '/server.js')).status, 403, 'server.js not served'); // path check
     assert.strictEqual((await fetch(base + '/../server.js')).status >= 400, true);
 

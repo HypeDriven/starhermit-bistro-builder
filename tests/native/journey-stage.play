@@ -1,0 +1,55 @@
+# Title → Journey → stage 1 (First Service: 60 coins in 120 s) played to its
+# results by the keyboard's table and pick-up keys, as tools/plan.mjs j01
+# times them from the rules engine (a rules tick every 6 frames here; the
+# 3-2-1 countdown takes ~156). Then Next stage, a pause and Leave service.
+until 300 ▶ Play
+frames 150
+save title
+frames 5
+click Journey
+until 60 Journey — 40 stages
+frames 5
+save journey
+click 1
+frames 100
+save countdown
+frames 60
+frames 238
+key Digit1 2
+frames 238
+key KeyK 2
+frames 238
+key KeyK 2
+frames 70
+key Digit1 2
+frames 166
+key KeyK 2
+frames 346
+key Digit1 2
+frames 16
+key KeyK 2
+frames 556
+key Digit1 2
+frames 16
+key KeyK 2
+frames 478
+key Digit1 2
+until 600 Goal reached!
+expect Total
+expect Next stage →
+frames 150
+save journey-results
+frames 5
+click Next stage →
+until 400 Pick up
+frames 5
+save stage2
+key Escape 2
+until 60 Leave service
+frames 5
+save pause
+click Leave service
+until 200 Service over — goal missed.
+frames 5
+click Home
+until 60 ▶ Play
