@@ -11,37 +11,37 @@
 | Genre | Real-time restaurant management / time-management puzzle |
 | Players | 1; asynchronous score comparison on ranked content |
 | Session | 90 s (Solo Sprint) to 5 min (Marathon); a Journey stage is 2–4 min; a Learn lesson under 1 min |
-| Platforms | Desktop and mobile browsers (portrait and landscape); WebGL optional |
-| Rendering | Three.js r160 (`vendor/three.module.min.js` + same-revision addons under `vendor/three/addons/`, mapped by an importmap) diorama with fully procedural geometry, plus a semantic HTML "station mirror" that is a complete playable text twin of the board |
-| Simulation | Fixed 100 ms tick, seeded, deterministic, replay envelope recorded per ranked run |
+| Platforms | StarHermit engine 1.14.0 script game: natively in the StarHermit client and in desktop and mobile browsers (portrait and landscape) through the engine's web runtime |
+| Rendering | `starhermit:scene` (the three.js model) diorama with fully procedural geometry, plus a `starhermit:ui` "station mirror" that is a complete playable text twin of the board |
+| Simulation | Fixed 100 ms tick (every 6 of the runtime's 60 Hz fixed steps), seeded, deterministic, replay envelope recorded per run |
 
 ### File map
 
 | Path | Role |
 |---|---|
-| `index.html` | Entry; importmap (`three`, `three/addons/`), loads `rng`, `rules`, `content`, `store`, `audio`, `ui` as globals, then `main.js` as a module |
+| `starhermit.txt` | Manifest: `engine.api=1`, `engine.entry=native/main.ts`, `engine.version=1.14.0`, `engine.minor=16`, capabilities `platform,storage,clipboard`, the 18 `control.*` actions with their `engine.gamepad.*` defaults and groups, `server=score-script.js`, `cover=cover.jpg` |
+| `index.html`, `starhermit-files.json` | The engine's web loader and file index, written by `npm run package` (`starhermit package --web .`); never edited by hand |
+| `native/main.ts` | Entry: session (fixed-step ticks, command dispatch + replay envelope, rewind, lessons, urgency cues, terminal → progression, achievements, local score comparison), screen state machine, input routing (actions, gamepad action picker, board taps), lifecycle |
+| `native/screens.ts` | `starhermit:ui`: header chips, objective and station rails / drawers, action tray, banner, toast, caption line, every screen |
+| `native/render.ts` | `starhermit:scene`: the room, figures, stations, camera framing into the playfield, plane-ray picking, look per graphics level |
+| `native/quality.ts` | The browser build's presets and budgets keyed by the runtime's quality tier |
+| `native/audio.ts` | Clips on the runtime's mixer, the rendered pad and clinks, the room-tone loop, captions |
+| `native/platform.ts` | Engine save (progress), game settings, browser-save and legacy-settings migration, invite, names, score posting |
+| `native/classic.ts` | Loads `js/*.js` as classic scripts (a `localStorage` shim over `starhermit:storage`), typed exports |
+| `native/i18n.ts`, `native/style.ts` | Locale from the runtime's interface language; UI styles, theme and palette tokens |
 | `js/rng.js` | mulberry32 PRNG, FNV-1a `hashString`, three derived streams (rules / decor / AV) |
 | `js/rules.js` | Pure rules engine: `createGame`, `legalActions`, `applyCommand`, `step`, `hint`, `hashState`, `serialize` |
 | `js/content.js` | 40 Journey stages, 5 lessons, 6 challenges, 3 practice paces, daily generator, 5 themes, validators, rival generator |
-| `js/store.js` | Versioned, checksummed localStorage save; settings defaults; local leaderboard; achievement definitions |
-| `js/audio.js` | WebAudio buses, authored Opus clips with synth fallbacks, room-tone loop, generative pad, captions |
-| `js/ui.js` | DOM builders: mode list, journey grid, setup bodies, settings form, help, profile, leaderboard, station mirror, upgrade panel, results table |
-| `js/render.js` | Three.js scene: instanced floor, walls, counter, tables, stoves, waiters, guests, pick layer, camera; graphics application (`setGraphics`, `graphicsInfo`), post chain, adaptive resolution, GPU probe |
-| `js/gfx.js` | Pure graphics quality model: presets, categories, per-preset budgets (`BUDGETS`, `budget`), hardware level → preset (`LEVELS`, `detectLevel`, `presetForLevel`, `detectPreset`), `resolve`, `choosePreset`, `setOverride`, `presetTier`, `describe` |
-| `js/gfx-panel.js` | Graphics section of the Settings screen (drawn into `#gfx-section .gfx-controls`; the wrapper also hosts the shared options panel) |
-| `js/gfx-strings.js` | Graphics-section and StarHermit account strings for en-US, en-GB, es-419, es-ES, de-DE, fr-FR, fr-CA, pt-BR, it-IT |
-| `js/i18n.js` | Every other player-facing string in the nine locales (`window.BBI18n`): shell, HUD, screens, settings, help, station panel, results, announcements, captions, content names |
-| `sh-language.js` | Shared StarHermit language preference (`window.StarHermitLanguage`), an unmodified copy of the canonical file |
-| `vendor/three/addons/` | three r160 addons: EffectComposer, RenderPass, ShaderPass, OutputPass, GTAOPass, UnrealBloomPass, SMAAPass, FXAAShader, RoomEnvironment and their imports |
-| `js/main.js` | Bootstrap, screen state machine, fixed-step loop, command dispatch + replay envelope, undo, lessons, HUD, input, persistence, host API |
-| `css/game.css` | Layout tokens, rails/drawers, HUD, screens, responsive and accessibility modes |
-| `score-script.js` | StarHermit platform script (`server=`): range-checks a finished run's total sent through `StarHermit.submitScores` and posts it to the `high-score` leaderboard (canonical copy in the games repo's `tools/score-script.js`) |
-| `server.js` | Local dev server: static host + `/api/v1/{time,scores,events}` with deterministic replay validation |
-| `data/scores.json` | Server-side leaderboard store (never served) |
-| `sfx/*.opus`, `sfx/manifest.txt` | 20 authored clips and the canonical event binding table (`manifest.json` feeds the generator, `manifest.md` is generated) |
+| `js/store.js` | Save document shape (settings defaults, progress), checksummed wrapper, `mergeDocs`, local leaderboard, achievement definitions |
+| `js/migrate.js` | Engine save document `{ v: 1, progress }`, the browser build's cloud save and per-player settings as they carry over |
+| `js/i18n.js` | Every player-facing string in the nine locales (account lines included) |
+| `tools/ui-style.css` → `assets/ui-style.json` | The browser CSS rewritten class-based; converted with `npm run css` |
+| `tools/plan.mjs`, `tools/package-web.mjs`, `tools/css.mjs`, `tools/browser-play.mjs` | Play-script service plans from the rules, packaging, CSS conversion, headless-Chrome play check |
+| `score-script.js` | StarHermit platform script (`server=`): range-checks a finished run's total and posts it to the `high-score` board |
+| `server.js`, `data/scores.json` | Local dev server (static files + replay-validating `/api/v1` routes, kept for its tests; not shipped) |
+| `sfx/*.opus`, `sfx/manifest.*` | 20 authored clips and the event binding table |
 | `assets/key-art.webp`, `assets/results-win.webp`, `assets/results-lose.webp` | Title key art and results illustrations |
-| `coverart.png`, `icon.png`, `favicon.svg`, `starhermit.txt` | Platform packaging |
-| `tests/run-tests.js`, `tests/gfx.test.mjs`, `tests/e2e.mjs` | Offline rules/content/server suite and graphics-model unit tests (`npm test`), and real-browser playthrough (`npm run test:e2e`) |
+| `tests/` | `run-tests.js` (rules/content/persistence/server), `migrate.test.js`, `i18n.test.js`, `native.mjs` + `native/*.play` |
 
 ## 2. Vision and design pillars
 
@@ -83,7 +83,7 @@
 | `buy {item}` | `cfg.mechanics[item]`, level below cap, `coins ≥ cost` (`buyInfo`) | `capacity`: +1 tray slot; `helper`: new autonomous waiter; `stove`: next slot, `stockCap += 3`; `expand`: open the next `cfg.expandSize` closed tables. |
 | `resign` | any time | Terminal `resigned`, loss. |
 
-Invalid reasons (`INVALID`): `game-ended`, `unknown-command`, `malformed-command`, `bad-table`, `table-not-open`, `no-waiting-guest`, `no-dishes-available`, `mechanic-not-available`, `cap-reached`, `insufficient-coins`, `tile-not-walkable`. `main.js#invalidText` maps each to a player sentence in the red toast and a live-region announcement.
+Invalid reasons (`INVALID`): `game-ended`, `unknown-command`, `malformed-command`, `bad-table`, `table-not-open`, `no-waiting-guest`, `no-dishes-available`, `mechanic-not-available`, `cap-reached`, `insufficient-coins`, `tile-not-walkable`. `native/main.ts` maps each (`inv.<reason>`) to a player sentence in the red toast and a live-region announcement.
 
 Costs (`content.js DEFAULT_COSTS`): tray 30/60/100, helper 50/90/140, stove 45/80, expand 40/90/150. "Frugal" and "Shoestring" override them.
 
@@ -111,8 +111,8 @@ All randomness is `RNG.derive(seed, STREAM_RULES)`; the stream state is stored i
 
 - Terminal reasons: `goal-reached`, `day-complete`, `day-failed`, `resigned`; `terminal.score` is a frozen copy, `elapsedMs = tick × 100`.
 - Leaderboard ties (`store.js#sortEntries`, mirrored in `server.js`): higher score, fewer invalid commands, lower `durationMs`, then `sessionId` string order.
-- Replay envelope (`main.js#onTerminal`): `{v:1, build, contentVersion, cfgId, seed, initialHash, t0, commands[{tick,id,cmd}], hashes (every 50 ticks + terminal), terminal, sessionId, invalid, durationMs}`. Command ids `c<tick>-<seq>` are unique per session; duplicates are rejected client- and server-side.
-- **Undo** (`main.js#undo`): available when `cfg.mechanics.undo` (Learn, Journey, Practice; never Daily or Challenges). A serialized snapshot is pushed before every accepted command (max 120); undo pops one, filters the command log to `tick ≤ restored tick`, and rebuilds the scene.
+- Replay envelope (`native/main.ts` `onTerminal`): `{v:1, build, contentVersion, cfgId, seed, initialHash, t0, commands[{tick,id,cmd}], hashes (every 50 ticks + terminal), terminal, sessionId, invalid, durationMs}`. Command ids `c<tick>-<seq>` are unique per session; duplicates are rejected client- and server-side.
+- **Undo** (`native/main.ts` `undo`): available when `cfg.mechanics.undo` (Learn, Journey, Practice; never Daily or Challenges). A serialized snapshot is pushed before every accepted command (max 120); undo pops one, filters the command log to `tick ≤ restored tick`, and rebuilds the scene.
 - **Hint** (`rules.js#hint`) reads only `legalActions`: urgent serve → any serve → pickup → "kitchen still cooking" → affordable upgrade → "wait for the next guest". The HUD hint line shows it continuously; the Hint button/`H` toasts it and highlights the table.
 
 ## 5. Modes and progression
@@ -121,68 +121,68 @@ All randomness is `RNG.derive(seed, STREAM_RULES)`; the stream state is stored i
 |---|---|---|---|---|---|
 | Learn | Play → Learn | 5 lessons (`LESSONS`): serve, pickup, patience, tray, hire+expand | no | no | Scripted `setup` states, spawn disabled (999 s), goal 0. Completion writes `tutorialDone[id]`. |
 | Journey | Title → Journey | 40 stages `j01`–`j40`; every fifth is "Mastery" | no | yes | Stage N+1 unlocks when stage N has ≥1 star. Best stars and score stored per stage. |
-| Daily | Title → Daily challenge | `dailyCfg(UTC date)` | yes | no | Seed `hashString('bistro-daily-YYYY-MM-DD')`; 4–5 open tables + 2 closed, guests every 4–5 to 6–8 s, patience 18–22 (+8) s, 150 s, goal derived from expected guests. Replayable all day; best score kept; streak tracked. |
+| Daily | Title → Daily challenge | `dailyCfg(UTC date of the device)` | yes | no | Seed `hashString('bistro-daily-YYYY-MM-DD')`; 4–5 open tables + 2 closed, guests every 4–5 to 6–8 s, patience 18–22 (+8) s, 150 s, goal derived from expected guests. Replayable all day; best score kept; streak tracked. |
 | Practice | Play → Practice | calm / normal / rush (`PRACTICE`) | no | yes | Endless 180 s day (goal 0 → `day-complete`), random seed per start, 11×7 room. |
 | Challenge | Play → Challenge | Solo Sprint, One Tray, Tiny Room, Rush Hour, Frugal, Marathon | yes | no | Constrained rulesets; seeds are `hashString('bistro-challenge-<id>')`. |
 
 **Difficulty curve (Journey).** j01–j05 introduce serving, tray, expansion and the first mastery (two rooms, 200 goal). j06–j10 add helpers, shorter patience, stoves and a 4-queue rush. j11–j20 widen the room (11×7, 11×9), cut price ("Thin Margins"), cut patience ("Fickle Foodies", 16–22 s) and start you in debt ("Expansion Debt": 20 coins, 4 walls). j21–j30 reach 13×7/13×9 rooms and 6-guest queues; j31–j40 push spawn to every 3–4 s, 7–8 tables, 8-deep queues and a 600-coin goal in "Mastery: Star Service". `validateCfg` rejects any stage whose goal exceeds 85 % of the theoretical ceiling `daySec/avgSpawn × (price+tipMax)`.
 
-**Achievements** (`store.js ACHIEVEMENTS`, granted in `main.js#checkAchievements`, idempotent): `first-service` (any completed round, lessons included), `full-house` (win with 0 lost and ≥8 served), `century` (100 served lifetime), `crew-chief` (5 hires lifetime), `mastery-row` (a star on every mastery stage), `regular` (3 distinct daily dates).
+**Achievements** (`store.js ACHIEVEMENTS`, granted in `native/main.ts` `checkAchievements`, idempotent): `first-service` (any completed round, lessons included), `full-house` (win with 0 lost and ≥8 served), `century` (100 served lifetime), `crew-chief` (5 hires lifetime), `mastery-row` (a star on every mastery stage), `regular` (3 distinct daily dates).
 
 **Cosmetics.** Five themes (Ember, Mint, Noir, Sunset, Frost) recolour floor, walls, tables, cloth, metal and door glow; they never touch rules or ring colours.
 
 ## 6. Controls and interaction
 
-| Input | Desktop | Mobile | Effect |
+Actions are declared in `starhermit.txt`; players rebind keys and pads in the runtime's Options (F1), and the Help → Keyboard card lists the effective keys (`bindingLabel`).
+
+| Action | Keys | Gamepad | Effect |
 |---|---|---|---|
-| Tap/click table with waiting guest | pointer | tap | `serve {table}` |
-| Tap/click stove | pointer | tap | `pickup` |
-| Tap/click floor tile | pointer | tap | `goto {x,y}` |
-| Drag > 10 px or hold > 600 ms on canvas | — | — | Treated as a camera/scroll gesture: no command (`onPointerDown`) |
-| `1`–`9` | key | — | Serve table N |
-| `K` / `H` / `U` / `F` / `C` | key | — | Pickup / hint / rewind / toggle 2× / re-frame camera |
-| `P` or `Esc` | key | — | Pause; on an in-round overlay, close it and resume |
-| Bottom toolbar buttons | click | tap | Pick up, Hint, Rewind (if allowed), Speed, Pause |
-| Station mirror **Serve** / **Pick up**, Upgrade buttons | click / Tab+Enter | tap (right drawer 🍽) | Same commands through DOM |
-| Gamepad | D-pad ◀▶ cycles `legalActions` with a toast, A commits, B/Start pause | — | `pollGamepad` |
+| `table1`–`table9` | `1`–`9`, `Numpad 1`–`9` | — | `serve {table}` |
+| `pickup` | `K` | West (X) | `pickup` |
+| `hint` | `H` | North (Y) | hint toast + table highlight |
+| `undo` | `U` | Left shoulder | rewind (practice / Learn / Journey) |
+| `speed` | `F` | Right shoulder | toggle 2× |
+| `camera` | `C` | Right stick press | re-frame the room |
+| `pause` | `P`, `Escape` | Start, East (B) | pause; on an in-round overlay (pause, settings, help) close it and resume; on a menu screen, back to the title |
+| `prev_action` / `next_action` | `[` / `]` | D-pad left / right | cycle the legal actions with a toast ("Serve table 2", "Buy Bigger tray (30c)") |
+| `commit` | `Space` | South (A) | do the chosen action |
 
-**Locking.** Commands are refused while `game.paused`, during the 3-2-1 countdown (paused), and after terminal (`not-active`). Fast-forward only scales the accumulator (max 40 steps per frame), never the rules. The sole non-interruptible phase is the 2-tick interact; a new serve command simply re-targets the walk.
+Pointer and touch: tapping a table serves it, a stove picks up, a floor tile walks there (`goto`); a drag over 10 px or a hold over 600 ms commits nothing. Every HUD, rail and screen control is a `starhermit:ui` widget reachable by Tab/arrows + Enter and by gamepad navigation; after a tray click focus returns to the room so action keys play.
 
-**Feedback per input.** Accepted command → `order-noted` clip and HUD refresh; buy → cash register, wall knock or apron cue; rejected → red toast with the reason, `error-buzz`, and "Not allowed: …" in the live region; hint → toast + sparkle + table ring scaled 1.18×; pause → suspended audio context and a modal; rewind → swoosh + "Rewound" toast.
+**Locking.** Commands are refused while paused, during the 3-2-1 countdown, and after terminal (`not-active`). Fast-forward runs a tick every 3 fixed steps instead of 6, never changing the rules. The sole non-interruptible phase is the 2-tick interact; a new serve command re-targets the walk.
+
+**Feedback per input.** Accepted command → `order-noted` clip; buy → cash register, wall knock or apron cue; rejected → red toast with the reason, `error-buzz`, and "Not allowed: …" announced; hint → toast + sparkle + table ring scaled 1.18×; pause → the beds fade and the pause screen; rewind → swoosh + "Rewound" toast.
 
 ## 7. Screens and UI flow
 
-State machine (`main.js#showScreen`, `openScreen`, `pauseGame`, `showResults`):
-
 ```
-boot → title ─┬→ modes ─┬→ learn ──────┐
-              │         ├→ journey ────┤
-              │         ├→ practice ───┼→ [countdown] → active ⇄ paused ─┬→ settings/help → paused
-              │         ├→ challenge ──┤                    │             └→ leave service ┐
-              ├→ daily ─┴──────────────┘                    ↓ terminal                    │
-              ├→ journey (direct)                      results ─┬→ play again / next stage │
-              ├→ profile / leaderboard / settings / help        └→ home → title ←──────────┘
+title ─┬→ modes ─┬→ learn ──────┐
+       │         ├→ journey ────┤
+       │         ├→ practice ───┼→ [countdown] → service ⇄ paused ─┬→ settings / help → paused
+       │         ├→ challenge ──┤                    │              └→ leave service ┐
+       ├→ daily ─┴──────────────┘                    ↓ terminal (+0.9 s)            │
+       ├→ journey (direct)                      results ─┬→ play again / next stage │
+       ├→ profile / leaderboard / settings / help        └→ home → title ←──────────┘
 ```
 
-Every screen is a `.screen[role=dialog][aria-label=<name>]` sheet (max 720 px) over the persistent shell; opening one focuses its first control. Only one screen exists at a time; Settings/Help opened from Pause return to Pause (`backToContext`), and the ☰ button pauses during play or returns home otherwise.
+Screens are full-window `starhermit:ui` sheets (max 720 px) that scroll when taller than the window; opening one focuses its first control once its layout settles (inside a scroll area focus may not take, so a tall screen is also driven by pointer). Settings/Help opened from Pause return to Pause; the header's Menu pauses during play.
 
-**Layouts (`css/game.css`).**
-- ≥1024 px: header bar (title, Coins/Earned/Clock/Served chips, ☰), 240 px left rail (objective, progress bar, hint, lesson step), central playfield with the bottom toolbar, 260 px right rail (station mirror, upgrade grid). Left-handed swaps the rails.
-- <1024 px: rails become slide-in drawers (📋 and 🍽 header buttons); "Always show station panel" docks the right rail permanently.
-- Portrait ≤700 px: toolbar buttons stretch to 30 % width in the bottom thumb zone; screens tighten padding.
-- Landscape ≤500 px tall: compressed header and chips, 44 px toolbar minimum; the title drops its key art and compacts the hero so the whole menu fits without scrolling.
-- Every screen opens at its top: the first control is focused without scrolling the sheet.
-- Large screens (above 1600×1000): `ui-scale.js` sets `--ui-scale` (1 up to a 1600×1000 viewport, then the smaller of width/1600 and height/1000, capped at 2.5) and the header, rails, screens, action tray, banner, toast, caption line and frame-rate meter are CSS-`zoom`ed by it (vw/vh lengths inside are divided by it); the playfield canvas is not zoomed and fills the space the larger chrome leaves.
-- Toasts sit bottom-centre of the playfield during play (one line up to 90% wide, then wrapping); while a screen (title, pause, results…) is open the toast floats above it, fixed to the viewport bottom, and the screen pads its bottom by the toast height so its last buttons can be scrolled clear.
-- Safe areas: `env(safe-area-inset-*)` pad the header, screens, toolbar, toast and caption line. Nothing critical sits under the bottom inset; the toolbar is the lowest interactive element and is inset-aware.
+**Layouts (`native/screens.ts`, by the window's logical size).**
+- Wide (≥ 1024 px): header bar (title + sub, Coins / Earned / Clock / Served chips, Menu), 240 px left rail (objective, progress bar, hint, lesson step), 260 px right rail (station mirror, upgrade grid), the room framed in between above the action tray. Left-handed swaps the rails.
+- Compact (< 1024 px): the rails are drawers opened by the header's Objective and Stations buttons; "Always show station panel" docks the right one. The chips wrap onto a second header row when they do not fit.
+- Portrait phone (≤ 700 px wide): the tray's buttons three to a row across the bottom; the title's sub-heading is dropped.
+- Short landscape (≤ 500 px tall): the tray is a column at the right of the playfield; the title drops its key art.
+- The camera frames the room into the playfield the header, rails and tray leave (`render.frameRoom`).
+- Toasts sit above the tray during play (one line, wrapping when long); over a screen they float at the window's bottom.
+- The runtime's safe area insets every placement; its interface size and text size scale everything.
 
-**Never cut off:** the four stat chips (they wrap), the toolbar, the results table and its buttons, and the station mirror's Serve buttons (the e2e test clicks them at both viewports).
+**Never cut off:** the four stat chips (they wrap), the tray, the results table and its buttons, and the station mirror's Serve buttons.
 
 ## 8. Art direction
 
 **Palette (CSS tokens).** Background `#14100d`, panel `#211a15`, panel-2 `#2b221b`, ink `#f2e9dd`, dim ink `#b8a894`, accent `#e8a54b`, danger `#e0574d`, ok `#7fd08a`, focus `#ffd27a`. High contrast: `#000/#101010/#1c1c1c`, ink `#fff`, accent `#ffd27a`, focus `#00e0ff`. High-visibility palette: accent `#ffb340`, danger `#ff6f61`, ok `#4dd0e1`.
 
-**Scene colours (`render.js`).** Background `0x14100d`; key light `0xffeedd` @2.2 from direction (6,12,4) aimed at the room centre, PCF soft shadows whose orthographic box is fitted to the room plus a 1-unit margin; hemisphere fill `0xd8ccbc`/`0x30231a` @0.9 (0.55 when reflections are on); ACES tone mapping at exposure 1.05, sRGB output. Player waiter `0xe8a54b`, helpers `0x7ec8e8`, skin `0xf0d8b8`, guest bodies cycle `0xc96f4a, 0x6f8fc9, 0x8fc96f, 0xc9c06f, 0xa06fc9`; patience ring lerps green `0x7fd08a` → amber `0xffb35c` → red `0xe0574d` at 50 % / 0 %; legal-target ring `0xffd27a`.
+**Scene colours (`native/render.ts`).** Background `0x14100d`; key light `0xffeedd` @2.2/π from direction (6,12,4) aimed at the room centre with the engine's view-based soft shadow; hemisphere fill `0xd8ccbc`/`0x30231a` @0.9/π (0.55/π when reflections are on); ACES tone mapping at exposure 1.05, sRGB output. Player waiter `0xe8a54b`, helpers `0x7ec8e8`, skin `0xf0d8b8`, guest bodies cycle `0xc96f4a, 0x6f8fc9, 0x8fc96f, 0xc9c06f, 0xa06fc9`; patience ring lerps green `0x7fd08a` → amber `0xffb35c` → red `0xe0574d` at 50 % / 0 %; legal-target ring `0xffd27a`.
 
 **Theme table (`content.js THEMES`).**
 
@@ -196,48 +196,30 @@ Every screen is a `.screen[role=dialog][aria-label=<name>]` sheet (max 720 px) o
 
 **Shape language.** Everything is a rounded primitive: capsule bodies with sphere heads, cylinder tables with a cloth disc, box stoves with a burner ring, a pan and translucent steam puffs, an instanced 0.98-tile checkerboard floor, 0.9-unit walls, a wooden counter along the kitchen row, six seeded wooden props outside the left wall (decor stream, cosmetic). Walled-off tables render at 35 % opacity behind a rotated grey barrier that is removed the tick the wall opens.
 
-**Graphics.** Materials are PBR (`MeshStandardMaterial`; clearcoat `MeshPhysicalMaterial` on table tops, tray plates, the polished counter slab and, with surface detail, the floor tiles). Optional effects, each a setting: key-light shadows (1024²/2048²/4096²); image-based lighting from a PMREM-filtered `RoomEnvironment` (reflections on metal stoves, pans, trays and glossy pieces; envMapIntensity 0.35–0.5); GTAO ambient occlusion for contact darkening; bloom limited to emissive sources (threshold 0.92: candle flames, festoon bulbs, lit burners, the door glow); a colour grade after the output pass (gentle S-curve, +10 % saturation, warm highlights / cool shadows, vignette 0.24); FXAA, SMAA or MSAA. **Surface detail** adds procedural canvas textures (speckled, bevel-edged floor tiles; wood grain on tables, legs, counter and props; mottled plaster walls), a dark wood cap rail on every wall, a stone counter slab, a table candle per table, a festoon of warm bulbs strung above the back wall between two posts, and a dim pool of street light outside the room that fades into the backdrop. **Steam particles** High gives each cooking stove six rising, swelling, fading puffs (Low: one bobbing puff). **Ambient animation** flickers candles, bulbs and burners and gives guests a slow idle bob; all of it stops under Reduced motion. Burners glow orange only while their stove cooks. The post chain is RenderPass → GTAO → UnrealBloom → OutputPass → grade → SMAA/FXAA into a HalfFloat target (4× MSAA samples when anti-aliasing is MSAA); it is built only when an effect needs it and rebuilt when its settings or size change. If it cannot be built or throws, the room renders directly and the Graphics section says post-processing is unavailable (nothing is logged to the console). Pixel ratio is `min(dpr, 2) × preset scale × render scale × adaptive scale`; adaptive resolution averages 90 frames and steps down 0.1 (to 0.6) when a frame averages over 26 ms, back up 0.05 (to 1) under 14 ms.
+**Graphics.** Materials are PBR (`MeshStandardMaterial`; clearcoat `MeshPhysicalMaterial` on table tops, tray plates, the polished counter slab and, with surface detail, the floor tiles). Effects per graphics level: key-light shadows (1024²/2048²/4096²); image-based lighting from three.js's `RoomEnvironment` prefiltered with `PMREMGenerator.fromScene` (environment intensity 0.3 against the materials' 0.35–0.5); `renderer.ao` contact darkening; `renderer.bloom` limited to emissive sources (threshold 0.92: candle flames, festoon bulbs, lit burners, the door glow); `renderer.grade` (display space: gentle S-curve, +10 % saturation, warm highlights / cool shadows, vignette 0.24); FXAA, SMAA or MSAA. **Surface detail** adds procedural `starhermit:canvas` textures (speckled, bevel-edged floor tiles; wood grain; mottled plaster; the street pool of light), a dark wood cap rail on every wall, a stone counter slab, a candle per table, a festoon of warm bulbs on a cord of thin cylinders between two posts, and the street outside. **Steam** high gives each cooking stove rising, swelling, fading puffs (low: one bobbing puff). **Ambient animation** flickers candles, bulbs and burners and bobs the guests; reduced motion stops it, the steam, the marker pulse, interpolation and camera impulses, and shortens the countdown beat to 200 ms.
 
-**Graphics settings.** Settings → **Graphics** (reachable from the title and the pause menu) offers: Quality (`#gfx-preset`: Auto (detected: …), Low, Balanced, High, Ultra), Render scale (`#gfx-scale`, 50–200 %), one select per effect (`#gfx-shadows`, `#gfx-ao`, `#gfx-bloom`, `#gfx-grade`, `#gfx-antialias`, `#gfx-reflections`, `#gfx-particles`, `#gfx-detail`, `#gfx-animation`, each defaulting to "From preset (…)"), Adaptive resolution (`#gfx-adaptive`, default on), Show frame rate (`#gfx-fps`, default off; a small `#fps-meter` pill bottom-left shows fps and pixel ratio), and a summary line (`#gfx-summary`) "GPU · Level N · cost summary · W×H px" (localized). Auto uses the StarHermit hardware level (below). Choosing a preset clears overrides. Changes apply live (shadow map, environment, post chain, pixel ratio; the WebGL renderer is swapped so the canvas is multisampled only when nothing is post-processed; surface detail and particle count rebuild the board) and persist in the save document as `settings.gfx` (a legacy `graphicsTier` migrates to a preset). `body[data-gfx-preset]` exposes the resolved preset.
+**Graphics level.** The runtime's Options › Graphics owns Auto and the ten levels, render scale and pixel-ratio cap, adaptive resolution, the frame-rate limit and readout. `native/quality.ts` maps the frame's quality tier to the browser build's presets (its 60 FPS-tuned table) and budgets; the steam puffs scale with the level above the tier's first (≤ 2×). A change that alters the budget rebuilds the room.
 
-| Preset | Scale | Shadows | AO | Bloom | Grade | AA | Reflections | Steam | Detail | Animation |
-|---|---|---|---|---|---|---|---|---|---|---|
-| Low | 0.85 | off | off | off | off | MSAA (canvas) | off | low | plain | static |
-| Balanced | 1 | 1024² | off | on | on | FXAA | on | low | detailed | animated |
-| High | 1 | 2048² | on | on | on | SMAA | on | high | detailed | animated |
-| Ultra | 1.25 | 4096² | high | on | on | MSAA (target) | on | high | detailed | animated |
+| Tier | Shadows | AO | Bloom | Grade | AA | Reflections | Steam | Detail | Animation | Materials | Segments | Textures | Puffs | Bloom res. |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| low | off | off | off | off | MSAA | off | low | plain | static | Lambert | ×0.5 | ×0.5 | 2 | ½ |
+| balanced | 1024² | off | on | on | FXAA | on | low | detailed | animated | standard | ×0.75 | ×1 | 3 | ½ |
+| high | 2048² | on | on | on | SMAA | on | high | detailed | animated | physical | ×1 | ×1 | 6 | ¾ |
+| ultra | 4096² | high | on | on | MSAA | on | high | detailed | animated | physical | ×1.5 | ×2 | 10 | full |
 
-**Hero.** The room itself, framed by a 38° perspective camera at elevation `11 × span/9` and offset `8.5 × span/9` looking at the room centre, so any grid from 9×7 to 13×11 fills the playfield. The player waiter carries a pulsing amber ring so the eye always finds the tray.
+**Hero.** The room itself, framed by a 38° perspective camera along the authored elevation/back ratio (11 : 8.5) at the distance that keeps every corner (plus the door queue and a margin) inside 90 % of the playfield, slid sideways to centre it there. The player waiter carries a pulsing amber ring.
 
-**Typography.** System UI stack, 16 px base (20 px with Larger text), tabular numerals on chips and tables, the logo at `clamp(2em, 7vw, 3.4em)` in accent. Line length capped at 70 ch for descriptions and help.
+**Typography.** The runtime's system UI face, 16 px base (the player's text size on top), the logo at 3.4 em (2 em on phones and short landscape). Descriptions and help wrap as paragraphs.
 
-**Motion.** Waiters lerp between tick positions with the frame alpha; steam bobs on a sine of the tick (or rises in puffs at High particles); candles, bulbs and burners shimmer and guests idle-bob when ambient animation is on; the player ring pulses; serve gives a 0.03-amplitude 0.18 s camera impulse and win/lose 0.08/0.4 s, after which `frameCamera` restores the authored pose. Drawers slide 0.22 s. **Reduced motion** removes interpolation (snap), steam, flicker and idle bob, ring pulse, camera impulses, drawer transitions and every CSS transition, and shortens the countdown cadence to 200 ms.
+**Motion.** Waiters lerp between tick positions with the fixed-step alpha; serve gives a 0.03-amplitude 0.18 s camera impulse and win/lose 0.08/0.4 s, after which the framed pose returns.
 
 **Visual assets the design calls for.** Title key art (miniature bistro diorama, 16:9), a win illustration (cleared table, full tip jar) and a loss illustration (closed room, empty jar) for results, and a platform cover derived from the key art. All four ship (see §15). Board geometry is deliberately procedural, so no 3D model asset is required.
 
-**Hardware level and Auto.** `gpu-level.js` (shared StarHermit detector, `window.StarHermitGpu`, loaded before `js/main.js`) rates the GPU 0–20 (0 = Galaxy S20 / Intel UHD or weaker, 20 = RTX 5090; laptop parts two levels lower; phones, tablets and ≤ 4 GB machines capped at 9; software renderers 0). Auto picks **Low 0, Balanced 4, High 10, Ultra 17**; adaptive resolution still steps down when frames are slow. On phones and tablets the shared frame-rate option paces Auto at half the display refresh rate and starts with 16 simultaneous sounds.
-
-**Per-preset budgets** (`BUDGETS` in `js/gfx.js`; each tuned to hold 60 FPS on the weakest GPU Auto gives it — Low: level 0, Balanced: level 4 Iris Xe, High: level 10 GTX 1070, Ultra: level 17 RTX 4080):
-
-| Preset | DPR cap | Materials | Curved-mesh segments | Texture resolution | Steam puffs per stove (Particles high) | Bloom resolution |
-|---|---|---|---|---|---|---|
-| Low | 1 | Lambert surfaces, Phong gloss | ×0.5 (min 3) | ×0.5 | 2 | ½ |
-| Balanced | 1.5 | Standard (no clearcoat) | ×0.75 | ×1 | 3 | ½ |
-| High | 2 | Standard + clearcoat Physical tops, plates, counter | ×1 | ×1 | 6 | ¾ |
-| Ultra | 2 (×1.25 scale) | as High | ×1.5 | ×2 | 10 | full |
-
-Segment scaling covers guests, tables, plates, candles, stoves, rings, bulbs and props (the invisible pick volumes keep their shape, so interaction is identical). Textures are generated procedurally at load (tile, wood, plaster, street) at the budget's size and cached per size. Steam puffs scale within the preset by the hardware level (`StarHermitGpu.scaleBudget`, ≤ 2×). A preset change that alters the budget rebuilds the board.
-
-**60 FPS benchmark** (`node tools/gfx-bench.mjs bistro-builder [--mobile --presets low,balanced]`, dev-only, real GPUs; hook `tests/gfx-bench.mjs` picks the preset in Settings → Graphics, starts Journey stage 1 and keeps picking up and serving through the station buttons). Measured 2026-10-17 with the revised gate (an empty full-window canvas is measured before each preset and subtracted percentile for percentile; typical p50 ≤ 12 ms and slow p90 ≤ 14 ms at the preset's floor level, CPU p90 ≤ 6 ms):
-
-- Desktop 1920×1080: PASS low (GPU p50 9.24 / p90 11.91 ms, empty canvas 10.16 / 11.79, on level 2 → at level 0: typical 0.00, slow 0.17; CPU p90 1.00 ms); PASS balanced (typical 6.86, slow 4.92 at level 4; CPU 1.60 ms); PASS high (typical 5.26, slow 4.90 at level 10; CPU 1.90 ms); PASS ultra (typical 3.43, slow 3.87 at level 17; CPU 2.10 ms).
-- Mobile 390×844 @3×: PASS low (typical 1.90, slow 7.48 at level 0; CPU 1.30 ms); PASS balanced (typical 5.89, slow 3.60 at level 4; CPU 1.70 ms).
-
 ## 9. Audio direction
 
-**Mix.** Four gain buses under one master — `music`, `effects`, `ambience`, `voice` (reserved; nothing routes to it) — each with a settings slider and a global mute (`audio.js#applySettings`). One-shots are authored Opus clips fetched lazily on first use and cached; while a clip is loading, or if it fails, the procedural synth for the same event plays instead, so no event is ever silent. Pitch variants on `cmd`, `spawn`, `pickup`, `serve` and `leave-happy` come from the seeded AV stream (`setAvRng`) for replay-consistent takes. Music is a generative low-passed triangle/sine pad walking C–Dm–G/B–Am every 4.8 s. Ambience is the authored `bistro-ambience` loop (loop points trimmed past the encoded fades) which fades out the synthesized brown-noise bed once decoded; seeded-random soft clinks continue on top. The context suspends on pause and on tab hide.
+**Mix.** The runtime's buses (Options › Audio owns volumes, mute and the voice limit): the one-shots and the ambience on `effects`, the countdown tap on `interface`, the pad on `music`; the browser build's default levels (effects 90 %, music 50 %, ambience 50 %) are folded into each sound's gain. One-shots are the authored Opus clips, loaded once the mixer runs (in browsers after the first press); the browser build's synthesized stand-ins while a clip loaded are not ported. Pitch variants (±6 %) on `cmd`, `spawn`, `pickup`, `serve` and `leave-happy` come from the seeded AV stream. Music is the low-passed triangle/sine pad walking C–Dm–G/B–Am every 4.8 s, each chord rendered once into a clip. Ambience is the authored `bistro-ambience` clip looped, with soft clinks (three rendered pitches) every 2.5–7.5 s. Pause fades the ambience and holds the pad.
 
-**Captions.** When "Captions for sound cues" is on, each event prints its caption (`CAPTIONS`) in the caption line above the toolbar for 1.8 s.
+**Captions.** When "Captions for sound cues" is on, each event prints its caption (`cap.<event>`, prefixed ♪) in the caption line above the tray for 1.8 s.
 
 **SFX event table** (source of `sfx/manifest.txt`):
 
@@ -268,68 +250,51 @@ Segment scaling covers guests, tables, plates, candles, stoves, rings, bulbs and
 
 Nine locales ship for all player-facing text: **en-US, en-GB, es-419, es-ES, de-DE, fr-FR, fr-CA, pt-BR, it-IT**.
 
-- **Strings**: `js/i18n.js` holds the shell (title bar, rails, drawer and HUD labels with `data-i18n`/`data-i18n-aria`), the HUD buttons and chips, objective line, hints (built from the structured `{key, vars}` that `rules.hint` now returns), refusal reasons, toasts, screen-reader announcements, sound-cue captions (audio ids mapped to keys), every screen (title, modes, Learn, Journey grid, Practice, Challenges, Daily facts, Settings, Help with the effective keys, Profile, Leaderboard), the station panel and upgrade buttons, results, pause and gamepad prompts, plus the content names (40 stages, 6 challenges with descriptions, 3 practice paces, 5 lessons with every step, 5 themes, 6 achievements). `content.js`/`store.js` keep English data; names come by id. The Graphics section (`gfx-panel.js`, now asked for the locale on each draw) and account lines come from `js/gfx-strings.js` for the same locale. en-GB says "Colour"; es-419 uses "hora pico"/"enojado", es-ES "hora punta"/"Pulsa"; fr-CA uses "pointage". `<html lang>` is the resolved tag.
-- **Language setting**: Settings → **Language → Game language** (rendered by `game-options.js` inside the Graphics section; Settings opens from the title and from Pause) offers **Automatic — <resolved language>** plus the nine locales by native name, with a status line (Saved to account / Saved on this device / Account sync unavailable). A change applies immediately: the open Settings screen relabels in place (`data-i18n` rows and the Graphics section redraw; the Language control keeps focus), any other open screen re-renders (results reuse the posted leaderboard outcome instead of posting again), and a running service rebuilds its HUD buttons, chips, objective, hint, station panel and lesson step while the simulation, timers and 3D scene continue.
-- **Resolution** (`sh-language.js`): explicit game choice → for Automatic, the StarHermit account's `preferredLanguage` (`GET /api/v1/me/language`, signed in only) → `navigator.languages` → `en-US`. Tags map to the nearest shipped locale (`es-MX → es-419`, `en-AU → en-GB`, `fr → fr-FR`, `pt-PT → pt-BR`). The choice (`auto` or a locale) is stored per player in `localStorage['bistro-builder.language.<user|guest>']` and, when signed in, in the per-player settings key `ui.language` as `{ choice }`; a failed settings read never overwrites it and the game never writes the platform preference. Standalone play makes no language request. `?lang=<tag>` forces a locale for the page load (QA links) and hides the selector.
-- Layout tolerates expansion: chips wrap, cards and help text cap at 70 ch, buttons are `inline-flex` with wrapping rows, and the level grid uses numbers only; German was checked at 390 px.
+- **Strings**: `js/i18n.js` holds the header, rails, HUD, objective, hints (from the structured `{key, vars}` of `rules.hint`), refusal reasons, toasts, announcements, captions, every screen, the station panel and upgrades, results, pause and gamepad prompts, the StarHermit account lines (`acct.*`) and the content names (40 stages, 6 challenges, 3 paces, 5 lessons with every step, 5 themes, 6 achievements). `content.js`/`store.js` keep English data; names come by id.
+- **Language**: the runtime's interface language (`preferences().language`: Options › Language, else the account's preferred language, else the device's) maps to the nearest shipped locale (`es-MX → es-419`, `en-AU → en-GB`, `fr → fr-FR`, `pt-PT → pt-BR`); a change applies on the next frame to every screen and the running service (the UI is rebuilt every frame). The game has no language menu of its own.
+- Colour emoji icons in the tables (🍽 💡 ⏪ ⏩ ⏸ ⏱ 🏆 🏅) are dropped where drawn (`tx`): the runtime's fonts have no colour emoji.
+- Layout tolerates expansion: chips wrap, long labels become paragraphs, upgrade labels wrap inside their buttons.
 
 ## 11. Accessibility
 
-- **Keyboard-only path:** Tab reaches every control; the station mirror and upgrade panel rebuild each tick but restore focus by `data-fkey` (`ui.js#rebuildKeepingFocus`), and never while a pointer is pressed inside them (the rebuild waits for the release, so every click lands on the button it was pressed on); number keys serve tables; `Esc` closes overlays; each screen focuses its first control on open. No keyboard trap: every dialog has a Back/Resume/Home button.
-- **Screen reader:** `aria-live="polite"` region announces round start, lesson steps, each serve with its payout, angry departures, urgency warnings and every rejected command; rails carry `aria-label`s; the canvas section explains that the stations panel is the text version; journey cells announce stage, name and stars.
-- **Captions** for every sound event (see §9); no information is audio-only — each cue has a ring, chip, toast or mirror row.
-- **Contrast:** ink `#f2e9dd` on `#14100d` (≈14:1); accent-on-dark buttons use `#1c1206` text; High contrast mode goes to pure black/white with a cyan focus ring; the 3 px `:focus-visible` outline uses `--focus`.
-- **Colour independence:** patience is ring colour *and* the mirror's "Waiting · Ns" countdown with `urgent` styling and bold text; high-visibility palette swaps red/green for orange/cyan.
-- **Reduced motion, Larger text (20 px), Left-handed rails, Haptics toggle, Always-show station panel, Fast-forward** all live in Settings and persist.
-- **Targets:** buttons are ≥44 px tall (36 px for the in-list "small" buttons, spaced 0.35 em); toolbar buttons ≥96 px wide on portrait phones.
-- **No WebGL:** `render.create` returns null, a compatibility note appears in the playfield, and the mirror remains the full game.
+- **Keyboard and gamepad:** every control is a `starhermit:ui` widget (Tab/arrows + Enter; D-pad + South); number keys serve tables; the gamepad's action picker plays the whole service; Escape / B closes in-round overlays.
+- **Screen reader:** `ui.announce` reports round start, lesson steps, each serve with its payout, angry departures, urgency warnings and every rejected command; the station mirror is a complete text twin of the room.
+- **Captions** for every sound event (§9); no information is audio-only.
+- **Contrast and colour:** the runtime's high contrast swaps the palette tokens to black/white with a cyan focus ring; the game's "Color-vision-safe palette" (high visibility) swaps accent/danger/ok to orange/cyan. Patience is ring colour *and* the mirror's "Waiting · Ns" with urgent styling.
+- **Reduced motion, interface size and text size** come from the runtime's Accessibility options; Left-handed rails, Haptics (stored; nothing vibrates yet), Always-show station panel and Fast-forward speed are the game's Settings.
+- **Targets:** buttons are ≥ 44 px tall (36 px for the in-list small buttons).
 
 ## 12. StarHermit integration
 
-Conventions per https://wiki.starhermit.com/ — packaging via `starhermit.txt` and an optional authoritative script.
+- **Package:** `starhermit.txt` (§1 file map); `.starhermitignore` leaves out `tests/`, `tools/`, `server.js`, `data/`. `npm run package` writes the web loader and file index after every change.
+- **Player:** `player()` from `starhermit:platform`; the title's account line reads "Playing as <name> · progress synced / saving… / cloud sync unavailable", or "Offline — progress is stored on this device." for a guest, or the signed-out notice after `onSessionEnded`. Signing in is the runtime's: the title's **Sign in with StarHermit** calls `requestSignIn()`. **Invite a friend** (signed in) copies the prefetched `inviteLink()` with `clipboard.writeText`.
+- **Save:** progress is the game's save (`saves`, `{ v: 1, progress }`, schema 1): on the device and in the account's slot; a conflict merges both (`mergeDocs`: more Journey stars, better bests, finished lessons, larger lifetime stats, latest `lastDaily`, every achievement at its earliest unlock); a newer account copy loaded later is merged in. The browser build's cloud save (slot `game:<slug>`, the SDK's checksummed `{ sum, payload }` document) shows as foreign: its progress is merged in, its game settings kept where the account has none, and it is replaced once (`replaceForeign`). Old browser `localStorage` progress of guests cannot migrate.
+- **Settings:** the game's own options (`captions`, `theme`, `colorPalette`, `leftHanded`, `haptics`, `boardMirror`, `speed`) are `settings` (game.<key>, synced with the account). The browser build's per-player keys are read once through `settings.legacyKeys()`: the game's own carried over unless set since, the rest (volumes, mute, graphics, reduced motion, contrast, text size, `ui.language`) dropped — the runtime's Options own them — and all removed.
+- **Leaderboard:** signed in, every finished run except lessons posts its total through `score-script.js` (a practice session whose socket carries `{ type: 'result', scores: { 'high-score': total } }`); the results card shows "Leaderboard rank: #N" (or posted / not posted). Guests post nothing.
+- **Local boards:** ranked rulesets (daily, challenges) keep a per-ruleset comparison on the device (`storage` key `bistrobuilder.leaderboards.v1`, top 100, ties by score, fewer invalid commands, shorter duration, session id) with the seeded house regulars; names of rows carrying a player id resolve through `profile()`.
+- **Daily date:** the device's UTC date (the engine has no server-time call; the browser build's `/api/v1/time` sync is gone).
+- **Lifecycle:** a hidden window pauses the service (`onSuspend`) and flushes the save; coming back shows "Service paused while you were away".
 
-**Used**
-- `starhermit.txt`: `name=Bistro Builder`, `launch=index.html`, `owner=<uuid>`, `server=score-script.js`, `cover=coverart.png`.
-- **Leaderboard:** when signed in, every finished run except lessons posts its final score total through `StarHermit.submitScores` (a practice session whose `score-script.js` posts it to the `high-score` board: integer, higher is better, 0–1,000,000; negative totals are rejected), and the results screen shows "Leaderboard rank: #N" (or posted / not posted). Standalone play posts nothing and shows no line.
-- `server.js` as the local dev server: serves the distribution (refusing `server.js`, `spec.md`, anything under `data/`, and paths escaping the root), and exposes `GET /api/v1/time` (daily boundary sync with round-trip offset in `main.js#syncServerTime` — the only route the client calls, and only when signed in; standalone uses the local clock and makes no `/api` or `/ws` request). The remaining routes are kept for the server tests but are not called by the client: `GET /api/v1/scores?cfgId=`, `POST /api/v1/scores` (full deterministic replay through `rules.js`; rejects stale content version, unknown content, seed mismatch, hash or score mismatch; per-IP rate limit 12/min; idempotent per session+content), and `POST /api/v1/events` (anonymous funnel counters: `app-start`, `round-start`, `round-end`, `tutorial-step`, `settings-change`).
-- Structured `{"error":"…"}` responses everywhere. The client keeps its leaderboard on the device (`store.js`) and sends no funnel events.
-- **SDK:** `starhermit-sdk.js` (verbatim copy of the canonical client) and `js/platform.js` (`window.BBPlatform`) load before every other script; the adapter calls `StarHermit.init()` as it loads. Without a token no StarHermit request is made.
-- **Launch token and renewal:** the SDK reads `#game_token=<jwt>[&session_id=]` or a sign-in return `#access_token=…`, strips it, takes the slug from `game_scope` (never hard-coded) and renews via `POST /api/v1/games/{slug}/launch-token`; the current token is also sent as `Authorization: Bearer` on `GET /api/v1/time`. If renewal is refused the title account line reads "Signed out of StarHermit — progress stays on this device." and play continues locally.
-- **Sign-in:** on `*.starhermit.com` without a token the title shows **Sign in with StarHermit** (`StarHermit.signIn()`); hidden when signed in and locally.
-- **Identity:** the title account line shows "Playing as <nickname> · <sync status>" (or the offline line). The leaderboard screen shows the device's local board for today's daily plus the seeded house regulars; `GET /api/v1/users/{id}/profile` (never `/api/v1/me`; `Player <id8>` fallback, no request when signed out) resolves nicknames for rows that carry a player id.
-- **Cloud save:** the whole save document (settings + progress, the checksummed `bistrobuilder.save.v1` wrapper) mirrors to `/api/v1/me/cloud-saves/game:{slug}`. On start the remote copy wins; localStorage stays the offline cache; every save queues a debounced (2 s) upload, flushed on `pagehide`/hidden.
-- **Settings KV:** every save sends the changed `settings` keys (volumes, mute, captions, graphics, theme, reduced motion, contrast, palette, text size, handedness, haptics, board mirror, speed) with `PATCH /api/v1/games/{slug}/settings`; on start the platform's values override the save document's.
-- **Invite:** when signed in the title shows **Invite a friend**, which copies `StarHermit.inviteLink()` and confirms with a toast (the link is shown if the clipboard is blocked).
-- **Controls:** `starhermit.txt` declares 15 `control.*` actions (`table1`–`table9`, `pickup`, `hint`, `undo`, `speed`, `camera`, `pause`); keydown routes by `event.code` through `StarHermit.loadBindings` (defaults standalone) and the Help → Keyboard card lists the effective keys. Escape always pauses/closes.
-- **Strings:** sign-in, invite, toast and account-line texts and the results-screen leaderboard line exist in all nine locales (`ACCOUNT_STRINGS` in `js/gfx-strings.js`) and follow the game language.
-- **Language preference:** Automatic follows the account's preferred language; an explicit choice syncs as `ui.language` (§10).
-- **Save conflicts:** cloud writes after a load are conditional; when another device saved first the SDK refuses the write and emits `saveconflict`. `BBPlatform` reloads the cloud copy and `main.js` merges it with the local document (`BBStore.mergeDocs`): more Journey stars, higher best scores per stage/challenge/daily/practice pace, finished lessons, the larger of each lifetime stat (latest `lastDaily`), every achievement with its earliest unlock; this device's settings stay and a service in progress (in memory) is untouched. The merge is saved locally and written back.
-- **Reports:** Settings → **Report a problem** (signed in only, from `game-options.js`) files a bug report through `StarHermit.reportBug` with a small non-personal `context.json` (viewport, language, FPS cap, audio limit); uncaught errors are filed as crash reports through `StarHermit.captureCrashes` (SDK-capped). Standalone play shows no report section and sends nothing.
-
-**Not used:** StarHermit achievements and the `server.js` score/event routes (achievements and the per-config score comparison stay local in the save document), avatars (no player chip), presence, activity start/end, platform sessions/matchmaking/invites/chat/replays (single-player), websockets, voice, entitlements.
+**Not used:** platform achievements (local in the save document), presence, rooms, matchmaking, chat, voice, replays, the `server.js` routes.
 
 ## 13. Technical architecture
 
-- **`rules.js`** is pure: no DOM, no `Date`, no `Math.random`; state is plain JSON with a `v` field; `hashState` uses a stable key-sorted stringify over everything but `events`. The same file runs in Node for tests and the server.
-- **`main.js`** owns the session object `{state, cfg, mode, lesson, commands, hashes, cmdIds, undoStack, over, paused, acc, prev, speed, urgentSeen, …}`, the `requestAnimationFrame` loop (dt clamped to 250 ms, up to 40 ticks per frame, a hash every 50 ticks), event draining to audio/announcements/lessons, and the replay envelope.
-- **`render.js`** consumes snapshots (`sync(state, prev, alpha)`), never mutates them, and rejects a state whose `cfg` identity differs (undo therefore rebuilds). Picking raycasts only the `LAYER_PICK` proxies (table cylinders, stove boxes, floor plane). Graphics quality comes from `gfx.js` via `setGraphics(resolved)` (see §8 Graphics). Hidden tabs render nothing.
-- **Persistence (`store.js`):** `bistrobuilder.save.v1` = `{sum: FNV-1a(payload), payload}` with settings + progress; a bad checksum or a future version yields a fresh document; a memory fallback covers private mode. `bistrobuilder.leaderboards.v1` holds the local board (top 100). Tokens and identity are never stored.
-- **Determinism:** rules stream (`0x9e3779b9`) for the simulation, decor stream (`0x85ebca6b`) for props and rival scores, AV stream (`0xc2b2ae35`) for pitch variants; cosmetic streams never feed rules.
-- **Budgets (by construction, not yet profiled):** one instanced floor draw, four walls, counter, one instanced prop mesh, ≤3 meshes + ring per table, 3 per stove, 3–4 per figure, one shadow-casting light; the Low preset renders directly with no shadow map and no post chain at 0.85× pixel ratio; the mirror DOM is rebuilt per tick (≤ 10 Hz) and is the main CPU cost on low-end phones.
-- **E2E drive:** `tests/e2e.mjs` runs its own static server (404 for `/api*` and `/ws*`; any such request fails the run), opens headless Chrome via `playwright-core` (falling back to Playwright's Firefox with software WebGL when Chrome's headless compositor cannot screenshot; `E2E_BROWSER=chrome|firefox` forces one), and plays only through visible UI — it reads the station mirror for state, clicks the mirror's Serve/Pick-up buttons at 1280×800 and presses the documented `1–9`/`K` keys at 390×844 (touch), toggles fast-forward with the real button, and fails on any `pageerror`, console error or console warning.
+- **`rules.js`** is pure: no DOM, no `Date`, no `Math.random`; state is plain JSON with a `v` field; `hashState` uses a stable key-sorted stringify. The same file runs in Node for tests and the server, and in the engine as a classic script.
+- **`native/main.ts`** owns the session `{state, cfg, mode, lesson, commands, hashes, cmdIds, undoStack, over, paused, prev, speed, sub, countdown, …}`: `onFixedUpdate` (60 Hz) counts the countdown beats (38 steps, 12 with reduced motion), advances a rules tick every 6 steps (3 at 2×), drains events to audio/announcements/lessons, hashes every 50 ticks and opens results 0.9 s after terminal; `onRender` syncs the room with the interpolation alpha and draws the UI.
+- **`native/render.ts`** consumes snapshots (`sync(state, prev, alpha)`), never mutates them, and rebuilds the room on a new round, undo, theme or budget change. Picking casts the pointer ray onto the table-top and floor planes (tables: radius 0.5 around their tile; stoves: their box), since the engine's raycaster hits only visible meshes.
+- **Determinism:** rules stream (`0x9e3779b9`), decor stream (`0x85ebca6b`) for props and rival scores, AV stream (`0xc2b2ae35`) for pitch variants; cosmetic streams never feed rules.
 
 ## 14. Testing and acceptance criteria
 
-`npm test` runs `tests/run-tests.js` (18 tests), `tests/platform.test.mjs` (StarHermit adapter: no requests standalone; token read and fragment stripped; nickname; settings patch of changed keys; cloud-save round trip through `game:<slug>`; control overrides; sign-out on refused renewal; account strings in all nine locales; a refused (412) write reloads and merges the cloud copy; every `js/i18n.js` key and content name in all nine locales) and `tests/gfx.test.mjs` (13 tests: the hardware level → preset mapping (SwiftShader / `Radeon Graphics` / UHD → Low, Iris Xe → Balanced, RTX 3070 → High, RTX 4080 / 5090 → Ultra) and the phone/tablet cap (Adreno 740, RTX 5090 → Balanced at most), the per-preset budget table, `resolve` with preset/override/scale clamp, presets clearing overrides, `describe`, Low cost bound, graphics strings for every locale, `settings.gfx` defaults and legacy migration). `run-tests.js` covers: initial state and hash; serve/pickup legality and every invalid reason; payout = price + tip and the total formula; buy caps, funds and mechanics flags; expansion and helper hiring; goal win / day fail / resign terminals and post-terminal rejection; lost-guest penalty; serialize round-trip and version rejection; deterministic replay hash equality; fuzzed malformed commands never hang or produce NaN; every content config passes `validateAll`; 40 stages with mastery every fifth; daily determinism per date; golden bot sessions terminate on easy/medium/hard/challenge/daily; save migration and future-version refusal; leaderboard tie order; achievement key shape; and a live server check (time, static files, `server.js` forbidden, honest envelope accepted, duplicate replaced, inflated score / stale version / unknown content rejected with 422, 404 shape).
+`npm test` runs:
+- `tests/run-tests.js` (18 tests): rules (legality, every invalid reason, payout and total, buys, expansion, hiring, terminals, lost-guest penalty, serialize, deterministic replay, fuzzed commands), content validators, 40 stages, daily determinism, golden bot sessions, save migration, tie order, achievement keys, and the dev server (time, static files, replay-validated scores, cheats rejected).
+- `tests/migrate.test.js`: the browser build's cloud save read back, corrupt/future saves refused, the engine save document, the two-device merge, which settings carry over.
+- `tests/i18n.test.js`: every key the client names or builds, and every US English key, in all nine locales with matching placeholders; content names; translations present.
+- `tests/native.mjs`: the web index matches the files (`npm run package` ran last), `tsc` over the host API declarations, `starhermit check .` with no warnings, and the play scripts as `--render-check --guest` runs: `journey-stage.play` (title → Journey grid → stage 1 played to "Goal reached!" with the keys `tools/plan.mjs j01` times from the rules → Next stage → pause → Leave service → Home), `learn-lesson.play` (lesson 1 by the table key with the Objective drawer, results, lesson 2 through the Stations drawer's Pick up and Serve), `practice-actions.play` (Serve and Bigger tray from the drawer, Hint, Speed, Rewind, camera, pause → Settings captions → Help → Leave service).
 
-`npm run test:e2e` (`tests/e2e.mjs`): title visible → Settings toggles reduced motion on `<body>` and closes → Graphics: Low then High (checks `body[data-gfx-preset]` and the summary), Shadows override Off and Show frame rate on, reload, both survive, back to Auto (overrides cleared) → Help opens/closes → Learn lesson 1 to "Lesson complete!" → Journey grid shows 40 cells with stage 1 unlocked → stage 1 played to a real results headline → progress persisted in localStorage → Play again → Pause freezes the clock → Resume → `U` rewinds and the clock keeps running → Pause → Settings → Ultra, two seconds of play at Ultra, back to Auto → Leave service → resign results → Home → a signed-in Language step (stubbed StarHermit API, `tests/starhermit-e2e.mjs`): `GET /api/v1/me/language` → `fr-CA` makes the title French ("▶ Jouer") and Automatic read "Automatique — Français (Canada)"; a Calm practice service is paused, Settings → Language → Italiano relabels Settings in place ("Impostazioni", "Musica") and PUTs `ui.language`, Report a problem posts a bug report, Back shows the Italian pause screen and HUD chips ("Monete") with unchanged numbers, and Automatic returns to fr-CA. Desktop pass then mobile pass; zero page errors (bearer-token requests that bypass `page.route` at unload are not counted as own-server calls).
+`npm run test:browser` (`tools/browser-play.mjs`) serves the packaged folder on loopback and plays it in headless Chrome at 1366×768 (keys into lesson 1, the table key, the results card), 390×844 touch (into lesson 1, a board tap, K, Escape) and 844×390 touch (menus by taps, a board tap), failing on console errors or warnings or the runtime's error screen.
 
-**QA bar (checkable):**
-- A new player sees instructions within one screen (title tip → Learn) and per-mechanic guidance (lesson step text + continuous hint line).
-- Every feature in this document is reachable by clicking visible UI at 1280×800 and 390×844, and the e2e run passes at both.
-- No console errors or warnings during the e2e run (GPU/SwiftShader notices excepted).
-- No text or control is clipped at either viewport: chips wrap, sheets scroll, toolbar fits.
-- Ranked results submitted to `server.js` cannot be forged: it reproduces the replay exactly or rejects it (the shipped client keeps boards locally and does not submit).
+**QA bar:** every feature is reachable by visible controls at desktop and phone sizes; no console errors or warnings; no text or control clipped (chips wrap, sheets scroll, the tray fits).
 
 ## 15. Asset inventory
 
@@ -339,39 +304,29 @@ Conventions per https://wiki.starhermit.com/ — packaging via `starhermit.txt` 
 | `assets/results-win.webp` (640×400, 15 KB) | Results illustration on a win / lesson complete | FLUX.2 klein, seed 5802, 30 steps | generated in this pass, wired |
 | `assets/results-lose.webp` (640×400, 15 KB) | Results illustration on goal missed / resign | FLUX.2 klein, seed 5803, 30 steps | generated in this pass, wired |
 | `coverart.png` (1200×675, 256-colour) | Platform cover (`cover=` in starhermit.txt) | Derived from key-art seed 5801 | replaced the generic placeholder in this pass |
-| `icon.png`, `favicon.svg` | Platform icon / tab icon | authored earlier | shipped |
+| `icon.png`, `cover.jpg` | Platform icon / cover | authored earlier | shipped |
 | `sfx/*.opus` × 15 (ui-tap … hint-sparkle) | Event one-shots (§9) | MOSS-SoundEffect v2.0, 100 steps | shipped |
 | `sfx/service-open-bell.opus`, `wall-knock.opus`, `patience-tick.opus`, `helper-hired.opus` | New event one-shots | MOSS-SoundEffect v2.0, 100 steps, seeds from the tool's name hash | generated in this pass, wired |
 | `sfx/bistro-ambience.opus` (10 s) | Ambience-bus loop | MOSS-SoundEffect v2.0, 100 steps | generated in this pass, wired |
 | `sfx/manifest.txt` | Canonical clip → event → description → context table | hand-authored | generated in this pass |
-| `vendor/three.module.min.js` | Renderer | three.js r160 (MIT) | shipped |
-| `vendor/three/addons/**` | Post-processing passes, shaders, RoomEnvironment | three.js 0.160.1 `examples/jsm` (MIT), same revision as the build | shipped |
 | 3D models / character animation | — | — | none required: geometry is procedural and figures are capsules (no rig) |
 
 ## 16. Known limitations
 
-- On software WebGL (llvmpipe) at low resolution, bloom around the tiny festoon bulbs can show faint square halos; hardware GPUs filter the bloom mips smoothly.
-- Presence and platform-side achievements are not called; the per-config score comparison is local to the device, and "house regulars" are seeded rivals, not real players.
-- The "Rewind" toast says "one second" but the snapshot cadence is one per accepted command; a rewind is "before your last command".
-- Queued guests who have no table drain patience while standing at the door, so an over-full queue can lose guests you never had a chance to serve.
-- Helper waiters share the Frost theme's accent colour (`0x7ec8e8`); under the Frost theme they are less distinct from the door glow.
-- `goto` (walk somewhere) exists only as a floor tap; there is no keyboard or DOM equivalent — it is never required to win.
-- Voice bus and haptics setting are stored and mixed but nothing produces voice or vibration.
-- Draw-call and frame-time budgets are stated by construction; no profiling captures are stored in the repo.
-- Journey stage titles, help and the daily date are not localized; the daily leaderboard title shows the raw config id (`daily-YYYY-MM-DD`).
+- Presence and platform-side achievements are not called; the per-ruleset score comparison is local to the device, and "house regulars" are seeded rivals, not real players.
+- The "Rewind" toast says "one second" but a snapshot is taken after every accepted command; a rewind returns to just after your last command.
+- Queued guests who have no table drain patience at the door, so an over-full queue can lose guests you never had a chance to serve.
+- Helper waiters share the Frost theme's accent colour; under Frost they are less distinct from the door glow.
+- `goto` (walk somewhere) exists only as a board tap; it is never required to win.
+- The haptics setting is stored but nothing vibrates; there is no voice content.
+- The daily follows the device's UTC date (no server time on the engine).
+- The room-tone clip loops whole (its encoded fades give a soft dip every 10 s); the synthesized stand-ins the browser build played while clips loaded are gone.
+- Guests' browser `localStorage` progress cannot migrate (cloud saves do).
+- Focus does not always take inside a scrolling screen (engine 1.14.0), so tall screens on short windows may open without a focused control; pointer and Tab still work.
 
 ## Design intent not yet implemented
 
-- Presence heartbeats, cloud-saved progress, and platform achievement endpoints per the StarHermit wiki, and per-config platform boards with friends filtering (launch-token identity, the global `high-score` board and board nickname display are done; per-config boards are device-local).
+- Presence, platform achievements, and per-ruleset platform boards with friends filtering (identity, the cloud save, the global `high-score` board and board nicknames are done; per-ruleset boards are device-local).
 - A per-second undo snapshot cadence to match the "Rewound one second" wording, or reword the toast.
 - Item-specific synth/clip cues for tray and stove purchases (currently the generic cash register).
 - Voice-bus content (a short greeter line on service start) and haptic pulses on `urgent` and `serve` on devices that support them.
-
-## Browser interference
-
-`browser-guard.js` (loaded from `index.html`) suppresses browser UI that gets in the way of play: the right-click context menu, the iOS long-press callout, copy / cut / paste, and page text selection. Text fields (inputs, textareas, selects, contenteditable) keep normal selection, context menu and clipboard behaviour.
-
-
-## Sound and frame-rate options
-
-The options panel includes Sound controls for master, music, effects and UI volume, a mute that preserves volume levels, and an Auto or manual concurrent-sound limit (1–64). Changes apply immediately with perceptual volume curves. A shared allocator bounds Web Audio and media playback, including loops and scheduled sources. Graphics includes Auto display refresh or a custom maximum frame rate from 1–1000 FPS; rendering is paced independently of simulation and input. Preferences persist locally, with FPS stored per detected GPU, and reconcile with Starhermit settings when signed in. The controls support keyboard and touch input and the supported English, Spanish, German, French, Portuguese and Italian locales.

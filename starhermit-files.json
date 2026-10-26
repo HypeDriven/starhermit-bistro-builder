@@ -48,7 +48,7 @@
     "sfx/tray-pickup.opus": {"sha256": "e386ce5fbf5222fe7b036a09486703b3c60974a756886864c88d7b0f66e7a27b", "size": 13770},
     "sfx/ui-tap.opus": {"sha256": "bac8dcdfd02633e9071e387541347af5d5544bc3abf7453da94c7882608fb0ef", "size": 10686},
     "sfx/wall-knock.opus": {"sha256": "5538b8cb87707d2cee800140d17c7057317eac55c273c89cefacc84f4b093eb6", "size": 31574},
-    "spec.md": {"sha256": "6f97ffb90d7475585931c1b58437dce62d7bc86b735e02787caeafe843d22cfd", "size": 55589},
+    "spec.md": {"sha256": "6dc2cf8038e0ac04beb48bf33b4480e61594d0bb9262e1fbec0f5b825b4ede8c", "size": 41336},
     "starhermit.txt": {"sha256": "46d57342132d30dea8167dda0dec53c4a1fbae08523101b9445b1c762c3c2443", "size": 2144}
   },
   "excluded": ["data/", "node_modules/", "package-lock.json", "package.json", "server.js", "tests/", "tools/", "tsconfig.json"],
