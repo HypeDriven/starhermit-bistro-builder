@@ -12,13 +12,14 @@
 //
 // The browser build made the pad, the clinks and the stand-in room tone with
 // Web Audio nodes; here the pad chords and the clinks are rendered once into
-// clips (createClip) with the same shapes, the room tone is the authored loop
-// streamed with the old loop points, and the synthesized stand-ins it played
+// clips (createClip) with the same shapes, the room tone is the authored clip
+// looped whole (streaming it with the old loop points made headless Chrome's
+// mixer warn that a stream's turn failed), and the synthesized stand-ins it played
 // while a sample loaded are not ported: the engine's browser runtime drops
 // clip loads and plays while a synthesis graph changes (the arrow-exodus
 // port's finding). Clips load once the mixer runs (natively at once, in a
 // browser after the first press).
-import { context, createClip, loadClip, play as playClip, stream, type AudioClip, type AudioStream, type Bus } from "starhermit:audio";
+import { context, createClip, loadClip, play as playClip, type AudioClip, type Bus, type Sound } from "starhermit:audio";
 import type { RngStream } from "./classic.ts";
 
 const LEVEL = { music: 0.5, effects: 0.9, ambience: 0.5 };
@@ -116,7 +117,8 @@ function clinkClip(freq: number): AudioClip {
 
 let started = false;
 let paused = false;
-let ambience: AudioStream | null = null;
+let ambience: Sound | null = null;
+let ambienceClip: AudioClip | null = null;
 const chords: AudioClip[] = [];
 const clinks: AudioClip[] = [];
 let chordIdx = 0;
@@ -129,7 +131,7 @@ export function start(): void { started = true; }
 export function setPaused(on: boolean): void {
   paused = on;
   if (!ambience) return;
-  try { if (on) ambience.pause(); else ambience.play(); } catch { ambience = null; }
+  try { ambience.fade(on ? 0 : 0.9 * LEVEL.ambience, 0.3); } catch { ambience = null; }
 }
 
 /** Each frame: what waited for the mixer, one rendered clip a frame, then
@@ -139,15 +141,16 @@ export function update(): void {
   if (wantClips) {
     wantClips = false;
     for (const name of new Set(Object.values(SAMPLES))) load(name);
+    loadClip("sfx/bistro-ambience.opus").then((c) => { ambienceClip = c; }, (e: unknown) => console.warn(`ambience: ${String(e)}`));
     return;
   }
   if (!started) return;
   try {
     if (chords.length < CHORDS.length) { chords.push(chordClip(CHORDS[chords.length]!)); return; }
     if (clinks.length < 3) { clinks.push(clinkClip(2000 + clinks.length * 600)); return; }
-    if (!ambience) {
-      // The authored 10 s room tone, looping inside its encoded fades.
-      ambience = stream("sfx/bistro-ambience.opus", { bus: "effects", gain: 0.9 * LEVEL.ambience, loop: true, loopStart: 0.05, loopEnd: 9.92, start: 0.05, paused });
+    if (!ambience && ambienceClip) {
+      // The authored 10 s room tone on the ambience level.
+      ambience = playClip(ambienceClip, { bus: "effects", gain: paused ? 0 : 0.9 * LEVEL.ambience, loop: true });
       return;
     }
   } catch (e) { console.warn(`beds: ${String(e)}`); started = false; return; }
