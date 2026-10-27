@@ -11,7 +11,7 @@
 | Genre | Real-time restaurant management / time-management puzzle |
 | Players | 1; asynchronous score comparison on ranked content |
 | Session | 90 s (Solo Sprint) to 5 min (Marathon); a Journey stage is 2–4 min; a Learn lesson under 1 min |
-| Platforms | StarHermit engine 1.17.0 script game: natively in the StarHermit client and in desktop and mobile browsers (portrait and landscape) through the engine's web runtime |
+| Platforms | StarHermit engine 1.18.0 script game: natively in the StarHermit client and in desktop and mobile browsers (portrait and landscape) through the engine's web runtime |
 | Rendering | `starhermit:scene` (the three.js model) diorama with fully procedural geometry, plus a `starhermit:ui` "station mirror" that is a complete playable text twin of the board |
 | Simulation | Fixed 100 ms tick (every 6 of the runtime's 60 Hz fixed steps), seeded, deterministic, replay envelope recorded per run |
 
@@ -19,7 +19,7 @@
 
 | Path | Role |
 |---|---|
-| `starhermit.txt` | Manifest: `engine.api=1`, `engine.entry=native/main.ts`, `engine.version=1.17.0`, `engine.minor=16`, capabilities `platform,storage,clipboard`, the 18 `control.*` actions with their `engine.gamepad.*` defaults and groups, `server=score-script.js`, `cover=cover.jpg` |
+| `starhermit.txt` | Manifest: `engine.api=1`, `engine.entry=native/main.ts`, `engine.version=1.18.0`, `engine.minor=16`, capabilities `platform,storage,clipboard`, the 18 `control.*` actions with their `engine.gamepad.*` defaults and groups, `server=score-script.js`, `cover=cover.jpg` |
 | `index.html`, `starhermit-files.json` | The engine's web loader and file index, written by `npm run package` (`starhermit package --web .`); never edited by hand |
 | `native/main.ts` | Entry: session (fixed-step ticks, command dispatch + replay envelope, rewind, lessons, urgency cues, terminal → progression, achievements, local score comparison), screen state machine, input routing (actions, gamepad action picker, board taps), lifecycle |
 | `native/screens.ts` | `starhermit:ui`: header chips, objective and station rails / drawers, action tray, banner, toast, caption line, every screen |
@@ -322,7 +322,7 @@ Nine locales ship for all player-facing text: **en-US, en-GB, es-419, es-ES, de-
 - The daily follows the device's UTC date (no server time on the engine).
 - The room-tone clip loops whole (its encoded fades give a soft dip every 10 s); the synthesized stand-ins the browser build played while clips loaded are gone.
 - Guests' browser `localStorage` progress cannot migrate (cloud saves do).
-- Focus does not always take inside a scrolling screen (engine 1.17.0), so tall screens on short windows may open without a focused control; pointer and Tab still work.
+- Focus does not always take inside a scrolling screen (engine 1.18.0), so tall screens on short windows may open without a focused control; pointer and Tab still work.
 
 ## Design intent not yet implemented
 
