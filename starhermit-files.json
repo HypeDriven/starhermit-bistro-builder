@@ -8,7 +8,7 @@
     "cover.jpg": {"sha256": "40fa0b9f2acb2df28d558de42d8ef8d80a3af33210baf0b07e418d50ee216fe8", "size": 226237},
     "coverart.png": {"sha256": "f8aa28d854a344454acce8fef3f2d38b6a65289e24a81fa5fff8dc78082173c6", "size": 371769},
     "icon.png": {"sha256": "f5d0ca3634f467f272566bf8613be0f0e0f250473689044770c3a5de94c9c9ac", "size": 7012},
-    "index.html": {"sha256": "5e5539e0cb8124fb4497eec423fe33d96ec7e2f441559bf2037a7a4a333b712c", "size": 1764},
+    "index.html": {"sha256": "6ba5192f17f9b9fd73fe9400a38ac60e76ca48e03dd6103cb852477d4c1417de", "size": 1764},
     "js/content.js": {"sha256": "b1faa75f474019226235c6be2b97e1280672649a840822ef072f56c6e2fc2090", "size": 23807},
     "js/i18n.js": {"sha256": "668fd20c689340f90b2f246a0c3b69089e31f5f4759df3da337e7b0e55665c02", "size": 106869},
     "js/migrate.js": {"sha256": "d56c84b98e2f145b75e834c920a50ba257340263493b6ef8a9133641f1d38370", "size": 4006},
@@ -48,8 +48,8 @@
     "sfx/tray-pickup.opus": {"sha256": "e386ce5fbf5222fe7b036a09486703b3c60974a756886864c88d7b0f66e7a27b", "size": 13770},
     "sfx/ui-tap.opus": {"sha256": "bac8dcdfd02633e9071e387541347af5d5544bc3abf7453da94c7882608fb0ef", "size": 10686},
     "sfx/wall-knock.opus": {"sha256": "5538b8cb87707d2cee800140d17c7057317eac55c273c89cefacc84f4b093eb6", "size": 31574},
-    "spec.md": {"sha256": "e246683f0d85e40444704b740925c3182c39086a3b35575afb743e62b2955550", "size": 41336},
-    "starhermit.txt": {"sha256": "ead98f7d73e3e0e519279c253a69e51a42522a6d28f492d31332fdf90c1eef98", "size": 2144}
+    "spec.md": {"sha256": "15e20f87ceeaab534aad22c40c84993a8b49bc87e4c6305bde8f0ecbe7c4f35a", "size": 41336},
+    "starhermit.txt": {"sha256": "1b5a9b8df4bf121df90006fec13ac9b0570ae61bc15d7c3e9eeb4def445590a3", "size": 2144}
   },
   "excluded": ["data/", "node_modules/", "package-lock.json", "package.json", "server.js", "tests/", "tools/", "tsconfig.json"],
   "format": 1
