@@ -8,7 +8,7 @@
     "cover.jpg": {"sha256": "40fa0b9f2acb2df28d558de42d8ef8d80a3af33210baf0b07e418d50ee216fe8", "size": 226237},
     "coverart.png": {"sha256": "f8aa28d854a344454acce8fef3f2d38b6a65289e24a81fa5fff8dc78082173c6", "size": 371769},
     "icon.png": {"sha256": "f5d0ca3634f467f272566bf8613be0f0e0f250473689044770c3a5de94c9c9ac", "size": 7012},
-    "index.html": {"sha256": "f5d09320598e2716e69768b166b89ccbafc351f5ee113f23a334b37e41b48a72", "size": 1764},
+    "index.html": {"sha256": "3e33373f9dff1c5502500587471d9c0784d615f38f187bc9f765dbdc67775439", "size": 1764},
     "js/content.js": {"sha256": "b1faa75f474019226235c6be2b97e1280672649a840822ef072f56c6e2fc2090", "size": 23807},
     "js/i18n.js": {"sha256": "668fd20c689340f90b2f246a0c3b69089e31f5f4759df3da337e7b0e55665c02", "size": 106869},
     "js/migrate.js": {"sha256": "d56c84b98e2f145b75e834c920a50ba257340263493b6ef8a9133641f1d38370", "size": 4006},
@@ -48,8 +48,8 @@
     "sfx/tray-pickup.opus": {"sha256": "e386ce5fbf5222fe7b036a09486703b3c60974a756886864c88d7b0f66e7a27b", "size": 13770},
     "sfx/ui-tap.opus": {"sha256": "bac8dcdfd02633e9071e387541347af5d5544bc3abf7453da94c7882608fb0ef", "size": 10686},
     "sfx/wall-knock.opus": {"sha256": "5538b8cb87707d2cee800140d17c7057317eac55c273c89cefacc84f4b093eb6", "size": 31574},
-    "spec.md": {"sha256": "92b22510719a8df815d8c0335fadc2783423a868a70a2d6a81272f5b4b442615", "size": 41336},
-    "starhermit.txt": {"sha256": "9df5a36eb53d48fd1c09cc66cc573c17aa23d0e7b6652153bf5e68ec4c6c03f2", "size": 2144}
+    "spec.md": {"sha256": "09943d1596ce81600865465cc12596b1c3eb94a964e48463fb72f13003b65945", "size": 41336},
+    "starhermit.txt": {"sha256": "fc7667094887a6729dc500b6f54a1cd83026c766795e96726bbb4260d778384e", "size": 2144}
   },
   "excluded": ["data/", "node_modules/", "package-lock.json", "package.json", "server.js", "tests/", "tools/", "tsconfig.json"],
   "format": 1
