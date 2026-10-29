@@ -747,7 +747,8 @@ export function applyLook(next: Look): void {
     denoise: { lumaPhi: 10, depthPhi: 2, normalPhi: 3, radius: next.ao === "high" ? 6 : 4, rings: 2, samples: next.ao === "high" ? 16 : 8, radiusExponent: 2 },
   };
   // High threshold: only the emissive lamps, candles, burners and the door glow bloom.
-  renderer.bloom = next.bloom ? { strength: 0.55, radius: 0.3, threshold: 0.92, resolution: next.budget.bloomRes } : null;
+  // The page's r160 UnrealBloomPass strength squared (minor 29 bloom follows r185).
+  renderer.bloom = next.bloom ? { strength: 0.3, radius: 0.3, threshold: 0.92, resolution: next.budget.bloomRes } : null;
   // The browser build's grade ShaderPass after OutputPass: a gentle S-curve
   // (0.22 of c²(3−2c)), saturation 1.1, cool shadows / warm highlights, and
   // the 0.24 vignette.
