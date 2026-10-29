@@ -21,15 +21,17 @@
 //   same curve, tints and vignette.
 // - MeshPhongMaterial (Low's gloss) is Lambert; the festoon's Line cord is
 //   thin cylinders; material.clone() (not available) is a new material.
-// - The key light's fitted orthographic shadow box is the engine's
-//   view-based directional shadow (`shadow.distance`).
-// - Light intensities are three.js r160's divided by π (the engine's
-//   convention). The canvas textures are CanvasTextures of starhermit:canvas
+// - The key light's shadow box is fitted to the room (fitShadow) as the
+//   browser build's was.
+// - Light intensities, shadow values and the PMREM RoomEnvironment(renderer)
+//   are three.js r160's as the page had them (engine minor 28). Standard
+//   materials get the room as their own envMap so their envMapIntensity
+//   applies as r160 did with scene.environment. The canvas textures are CanvasTextures of starhermit:canvas
 //   (sRGB, as the browser build's SRGBColorSpace CanvasTextures were).
 import {
   ACESFilmicToneMapping, BoxGeometry, CanvasTexture, CapsuleGeometry, Color, CylinderGeometry, DirectionalLight,
   DoubleSide, Group, HemisphereLight, InstancedMesh, Matrix4, Mesh, MeshBasicMaterial, MeshLambertMaterial,
-  MeshPhysicalMaterial, MeshStandardMaterial, PMREMGenerator, PerspectiveCamera, PlaneGeometry, Raycaster, RoomEnvironment,
+  MeshPhysicalMaterial, MeshStandardMaterial, OrthographicCamera, PCFSoftShadowMap, PMREMGenerator, PerspectiveCamera, PlaneGeometry, Raycaster, RoomEnvironment,
   RingGeometry, SRGBColorSpace, SphereGeometry, TorusGeometry, Vector3, pointerToNdc, renderer, scene,
 } from "starhermit:scene";
 import type { Material, Object3D, Texture } from "starhermit:scene";
@@ -41,8 +43,6 @@ const TILE = 1.0;
 const CAM_ELEV = 11, CAM_BACK = 8.5, CAM_FOV = 38;
 const BG = 0x14100d;
 const PI = Math.PI;
-/** The RoomEnvironment's brightness against the browser build's (the engine's room lights stronger; matched by eye). */
-const ENV_INTENSITY = 0.3;
 
 const camera = new PerspectiveCamera(CAM_FOV, 16 / 9, 0.1, 100);
 let look: Look | null = null;
@@ -55,12 +55,23 @@ const seg = (n: number): number => Math.max(3, Math.round(n * BUD.segments));
 
 // --- lights -------------------------------------------------------------------------
 const KEY_DIR = new Vector3(6, 12, 4).normalize();
-const keyLight = new DirectionalLight(0xffeedd, 2.2 / PI);
+const keyLight = new DirectionalLight(0xffeedd, 2.2);
+keyLight.position.copy(KEY_DIR).multiplyScalar(20);
 keyLight.shadow.bias = -0.0004;
-keyLight.shadow.normalBias = 1;
-keyLight.shadow.radius = 2; // PCFSoftShadowMap's soft edge
-keyLight.shadow.distance = 30;
-const fill = new HemisphereLight(0xd8ccbc, 0x30231a, 0.9 / PI);
+keyLight.shadow.normalBias = 0.02;
+const fill = new HemisphereLight(0xd8ccbc, 0x30231a, 0.9);
+/** The key light's orthographic shadow box fitted to the room (the browser build's fitShadow). */
+function fitShadow(): void {
+  if (!cfg) return;
+  const c = gridToWorld((cfg.grid.w - 1) / 2, (cfg.grid.h - 1) / 2);
+  const hw = (cfg.grid.w / 2) * TILE + 1.0, hd = (cfg.grid.h / 2) * TILE + 1.0;
+  const r = Math.hypot(hw, hd) + 0.3;
+  keyLight.target.position.copy(c);
+  keyLight.position.copy(c).addScaledVector(KEY_DIR, 20);
+  const cam = keyLight.shadow.camera as OrthographicCamera;
+  cam.left = -r; cam.right = r; cam.top = r; cam.bottom = -r; cam.near = 20 - r - 2; cam.far = 20 + r + 2;
+  cam.updateProjectionMatrix();
+}
 
 // --- procedural textures (cached per size; shared across rebuilds) ---------------------
 const texCache = new Map<string, Texture>();
@@ -466,6 +477,8 @@ export function build(state: State, themeIn: Theme, seed: number): void {
     waiterViews[wt.id] = v;
   }
   fitKey = "";
+  fitShadow();
+  applyEnvMaps();
 }
 
 /** No round: the room stays as it was (the menus draw over it). */
@@ -485,6 +498,8 @@ export function frameRoom(rect: Rect, aspect: number): void {
   const key = [rect.x0, rect.y0, rect.x1, rect.y1, aspect].map((n) => n.toFixed(4)).join(",") + cfg.id;
   if (key === fitKey) return;
   fitKey = key;
+  camera.aspect = aspect;
+  camera.updateProjectionMatrix();
   const { w, h } = cfg.grid;
   const c = gridToWorld((w - 1) / 2, (h - 1) / 2);
   const hw = (w / 2) * TILE + 1.2, hd = (h / 2) * TILE + 1.2;
@@ -687,10 +702,22 @@ let envTex: Texture | null = null;
 function buildEnvironment(): void {
   if (envTex) return;
   try {
-    envTex = new PMREMGenerator().fromScene(new RoomEnvironment(), 0.04).texture;
+    envTex = new PMREMGenerator(renderer).fromScene(new RoomEnvironment(renderer), 0.04).texture;
   } catch (e) {
     console.warn("environment:", e instanceof Error ? e.message : String(e));
   }
+}
+
+/** r160 scaled scene.environment by each material's envMapIntensity; the
+ * engine (as three r163+) does that only for a material's own envMap, so
+ * every standard material carries the room while reflections are on. */
+function applyEnvMaps(): void {
+  const env = look?.reflections ? envTex : null;
+  scene.traverse((o) => {
+    if (!(o instanceof Mesh)) return;
+    const m = o.material;
+    if (m instanceof MeshStandardMaterial && m.envMap !== env) { m.envMap = env; }
+  });
 }
 
 /** The look for the frame's graphics level; cheap when nothing changed.
@@ -702,17 +729,18 @@ export function applyLook(next: Look): void {
   if (!built) setup();
   const shadows = next.shadows > 0;
   renderer.shadowMap.enabled = shadows;
+  renderer.shadowMap.type = PCFSoftShadowMap;
   keyLight.castShadow = shadows;
   if (shadows) keyLight.shadow.mapSize = next.shadows;
   if (next.reflections) {
     buildEnvironment();
     scene.environment = envTex;
-    scene.environmentIntensity = ENV_INTENSITY;
-    fill.intensity = 0.55 / PI;
+    fill.intensity = 0.55;
   } else {
     scene.environment = null;
-    fill.intensity = 0.9 / PI;
+    fill.intensity = 0.9;
   }
+  applyEnvMaps();
   renderer.ao = next.ao === "off" ? null : {
     blendIntensity: 0.75, radius: 0.35, distanceExponent: 1.4, thickness: 1.0, scale: 1.0,
     samples: next.ao === "high" ? 16 : 8,
@@ -746,6 +774,4 @@ export function frame(dtRaw: number): void {
     camera.position.x += (Math.random() - 0.5) * a;
     camera.position.z += (Math.random() - 0.5) * a;
   }
-  keyLight.target.position.copy(camBase.target);
-  keyLight.position.copy(camBase.target).addScaledVector(KEY_DIR, 20);
 }
