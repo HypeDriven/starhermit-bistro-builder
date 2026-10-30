@@ -747,15 +747,15 @@ export function applyLook(next: Look): void {
     denoise: { lumaPhi: 10, depthPhi: 2, normalPhi: 3, radius: next.ao === "high" ? 6 : 4, rings: 2, samples: next.ao === "high" ? 16 : 8, radiusExponent: 2 },
   };
   // High threshold: only the emissive lamps, candles, burners and the door glow bloom.
-  // The page's r160 UnrealBloomPass strength squared (minor 29 bloom follows r185).
-  renderer.bloom = next.bloom ? { strength: 0.3, radius: 0.3, threshold: 0.92, resolution: next.budget.bloomRes } : null;
+  // The page's r160 UnrealBloomPass exactly (model "r160", strength 0.55 as written).
+  renderer.bloom = next.bloom ? { model: "r160", strength: 0.55, radius: 0.3, threshold: 0.92, resolution: next.budget.bloomRes } : null;
   // The browser build's grade ShaderPass after OutputPass: a gentle S-curve
   // (0.22 of c²(3−2c)), saturation 1.1, cool shadows / warm highlights, and
   // the 0.24 vignette.
   renderer.grade = next.grade ? {
-    space: "display", contrast: 0.11, saturation: 1.1,
+    space: "display", contrastCurve: "s", contrast: 0.22, saturation: 1.1,
     shadows: [0.97, 0.98, 1.03], highlights: [1.04, 1.0, 0.95], split: [0.2, 0.8],
-    vignette: { amount: 0.24, inner: 0.38, outer: 0.85 },
+    vignette: { amount: 0.24, inner: 0.38, outer: 0.85, scale: [1, 0.85] },
   } : null;
   renderer.antialias = next.antialias;
   if (world && lastState && theme && builtKey !== lookKey()) build(lastState, theme, lastSeed);
