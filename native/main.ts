@@ -14,7 +14,7 @@
 // The service clock is the runtime's fixed steps (60 a second): a rules tick
 // every 6 steps (every 3 at 2× speed), only while the service runs, so
 // pausing, a hidden window or a slow frame never moves it.
-import { frame, onFixedUpdate, onPreferencesChange, onQuit, onRender, onResume, onStart, onSuspend, onUpdate, preferences, setFixedRate } from "starhermit:engine";
+import { frame, levelSettings, onFixedUpdate, onPreferencesChange, onQuit, onRender, onResume, onStart, onSuspend, onUpdate, preferences, setFixedRate } from "starhermit:engine";
 import { bindingLabel, onAction, onPointerButton, onTouch } from "starhermit:input";
 import * as ui from "starhermit:ui";
 import { onPlayerChange, onSessionEnded } from "starhermit:platform";
@@ -530,10 +530,10 @@ onTouch((e) => {
 let lookKey = "";
 function applyLook(): void {
   const f = frame();
-  const key = `${f.quality}:${f.levelIndex}`;
+  const key = f.level;
   if (key === lookKey) return;
   lookKey = key;
-  render.applyLook(lookFor(f.quality, f.levelIndex));
+  render.applyLook(lookFor(levelSettings(f.level)));
 }
 function applyPrefs(): void {
   const p = preferences();

@@ -10,8 +10,7 @@
 //
 // What changed from three.js, and why:
 // - The camera frames the room inside the playfield rectangle the HUD
-//   leaves (screens.ts passes it) by moving camera and target sideways
-//   (frameRoom), as the engine has no setViewOffset.
+//   leaves (screens.ts passes it) with a view offset (frameRoom).
 // - Picking: the engine's raycaster hits only visible meshes, so the
 //   invisible pick proxies are a ray cast onto the table-top and floor
 //   planes, mapped to the grid (tables and stoves sit on their tiles).
@@ -46,11 +45,10 @@ const PI = Math.PI;
 
 const camera = new PerspectiveCamera(CAM_FOV, 16 / 9, 0.1, 100);
 let look: Look | null = null;
-let BUD: Budget = { material: "physical", segments: 1, texture: 1, steam: 6, bloomRes: 1 };
+let BUD: Budget = { material: "physical", segments: 1, texture: 1, steam: 6 };
 let reducedMotion = false;
 let built = false;
 const _m = new Matrix4();
-const _v = new Vector3();
 const seg = (n: number): number => Math.max(3, Math.round(n * BUD.segments));
 
 // --- lights -------------------------------------------------------------------------
@@ -485,56 +483,50 @@ export function build(state: State, themeIn: Theme, seed: number): void {
 export function hasRoom(): boolean { return !!world; }
 
 // --- camera ------------------------------------------------------------------------------
-/** The playfield rectangle in normalized device coordinates (−1..1, y up). */
-export interface Rect { x0: number; y0: number; x1: number; y1: number }
+/** The playfield rectangle the HUD leaves (window pixels). */
+export interface Rect { x: number; y: number; w: number; h: number }
 let fitKey = "";
 let camBase = { pos: new Vector3(0, 10, 10), target: new Vector3() };
 /** Frames the whole room (plus the door queue and a margin) inside `rect`
- * on both axes: the authored elevation/back ratio is kept, the distance
- * grows until every projected corner is inside, and camera and target slide
- * sideways so the room sits in the rectangle's centre. */
-export function frameRoom(rect: Rect, aspect: number): void {
+ * on both axes: the camera's aspect is the rectangle's and a view offset
+ * paints the window around it (setViewOffset); the authored elevation/back
+ * ratio is kept, the distance is the nearest that keeps every corner inside,
+ * and the view is shifted so the room's projected box sits in the
+ * rectangle's centre. */
+export function frameRoom(rect: Rect, fw: number, fh: number): void {
   if (!cfg) return;
-  const key = [rect.x0, rect.y0, rect.x1, rect.y1, aspect].map((n) => n.toFixed(4)).join(",") + cfg.id;
+  const key = [rect.x, rect.y, rect.w, rect.h, fw, fh].map((n) => Math.round(n)).join(",") + cfg.id;
   if (key === fitKey) return;
   fitKey = key;
-  camera.aspect = aspect;
-  camera.updateProjectionMatrix();
+  const aspect = rect.w / rect.h;
   const { w, h } = cfg.grid;
   const c = gridToWorld((w - 1) / 2, (h - 1) / 2);
   const hw = (w / 2) * TILE + 1.2, hd = (h / 2) * TILE + 1.2;
-  const pts: Vector3[] = [];
-  for (const x of [-hw, hw]) for (const z of [-hd, hd]) for (const y of [0, 1.6]) pts.push(new Vector3(c.x + x, y, c.z + z));
   const dir = new Vector3(0, CAM_ELEV, CAM_BACK).normalize();
-  const right = new Vector3(1, 0, 0);
   const up = new Vector3(0, dir.z, -dir.y); // the view's up, perpendicular to its axis
-  const rw = (rect.x1 - rect.x0) / 2, rh = (rect.y1 - rect.y0) / 2;
-  const mx = (rect.x0 + rect.x1) / 2, my = (rect.y0 + rect.y1) / 2;
   const tanHalf = Math.tan((CAM_FOV * PI) / 180 / 2);
   const margin = 0.9;
-  let d = Math.hypot(CAM_ELEV, CAM_BACK) * (Math.max(w, h) / 9);
-  let ox = 0, oy = 0;
-  const pos = new Vector3(), target = new Vector3();
-  for (let i = 0; i < 48; i++) {
-    target.copy(c).addScaledVector(right, ox).addScaledVector(up, oy);
-    pos.copy(target).addScaledVector(dir, d);
-    camera.position.copy(pos);
-    camera.lookAt(target);
-    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-    for (const p of pts) {
-      _v.copy(p).project(camera);
-      minX = Math.min(minX, _v.x); maxX = Math.max(maxX, _v.x); minY = Math.min(minY, _v.y); maxY = Math.max(maxY, _v.y);
-    }
-    const over = Math.max((maxX - minX) / 2 / (rw * margin), (maxY - minY) / 2 / (rh * margin));
-    const ex = mx - (minX + maxX) / 2, ey = my - (minY + maxY) / 2;
-    if (over > 1.001) { d *= Math.min(1.6, over + 0.02); continue; }
-    if (Math.abs(ex) < 0.002 && Math.abs(ey) < 0.002) break;
-    // Sliding camera and target by Δ moves the image by −Δ over half the view's extent there.
-    ox -= ex * tanHalf * d * aspect;
-    oy -= ey * tanHalf * d;
+  // Corners in view space about the target (x right, y up, z toward the camera).
+  const pts: [number, number, number][] = [];
+  for (const x of [-hw, hw]) for (const z of [-hd, hd]) for (const y of [0, 1.6]) {
+    const p = new Vector3(x, y - c.y, z);
+    pts.push([p.x, p.dot(up), p.dot(dir)]);
   }
+  // The nearest distance that holds every corner within the margin about the target.
+  let d = 0;
+  for (const [x, y, z] of pts) d = Math.max(d, z + Math.abs(x) / (margin * tanHalf * aspect), z + Math.abs(y) / (margin * tanHalf));
+  // Centre the projected box: shift the view window by the box's centre.
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  for (const [x, y, z] of pts) {
+    const px = x / ((d - z) * tanHalf * aspect), py = y / ((d - z) * tanHalf);
+    minX = Math.min(minX, px); maxX = Math.max(maxX, px); minY = Math.min(minY, py); maxY = Math.max(maxY, py);
+  }
+  const sx = ((minX + maxX) / 2) * (rect.w / 2), sy = -((minY + maxY) / 2) * (rect.h / 2);
+  camera.setViewOffset(rect.w, rect.h, -rect.x + sx, -rect.y + sy, fw, fh);
+  camera.aspect = aspect;
+  camera.updateProjectionMatrix();
   camera.far = Math.max(100, d * 4);
-  camBase = { pos: camera.position.clone(), target: target.clone() };
+  camBase = { pos: c.clone().addScaledVector(dir, d), target: c.clone() };
 }
 /** The C key: frame the room again (and stop an impulse). */
 export function reframe(): void { fitKey = ""; shakeT = 0; }
@@ -731,6 +723,7 @@ export function applyLook(next: Look): void {
   renderer.shadowMap.enabled = shadows;
   renderer.shadowMap.type = PCFSoftShadowMap;
   keyLight.castShadow = shadows;
+  // Since minor 23 the engine keeps the game's mapSize whatever the level, so the level's size is set here.
   if (shadows) keyLight.shadow.mapSize = next.shadows;
   if (next.reflections) {
     buildEnvironment();
@@ -741,14 +734,18 @@ export function applyLook(next: Look): void {
     fill.intensity = 0.9;
   }
   applyEnvMaps();
-  renderer.ao = next.ao === "off" ? null : {
+  // The browser build's composer chain with the level's effects (levelSettings()): which run, AO's
+  // resolution and samples, bloom's resolution. Full-resolution AO (the engine's "high") takes the
+  // browser's Ultra denoise radius.
+  const ao = next.ao, full = !!ao && ao.resolution >= 1;
+  renderer.ao = ao && {
     blendIntensity: 0.75, radius: 0.35, distanceExponent: 1.4, thickness: 1.0, scale: 1.0,
-    samples: next.ao === "high" ? 16 : 8,
-    denoise: { lumaPhi: 10, depthPhi: 2, normalPhi: 3, radius: next.ao === "high" ? 6 : 4, rings: 2, samples: next.ao === "high" ? 16 : 8, radiusExponent: 2 },
+    samples: ao.samples, resolution: ao.resolution,
+    denoise: { lumaPhi: 10, depthPhi: 2, normalPhi: 3, radius: full ? 6 : 4, rings: 2, samples: ao.denoiseSamples, radiusExponent: 2 },
   };
   // High threshold: only the emissive lamps, candles, burners and the door glow bloom.
   // The page's r160 UnrealBloomPass exactly (model "r160", strength 0.55 as written).
-  renderer.bloom = next.bloom ? { model: "r160", strength: 0.55, radius: 0.3, threshold: 0.92, resolution: next.budget.bloomRes } : null;
+  renderer.bloom = next.bloom === null ? null : { model: "r160", strength: 0.55, radius: 0.3, threshold: 0.92, resolution: next.bloom };
   // The browser build's grade ShaderPass after OutputPass: a gentle S-curve
   // (0.22 of c²(3−2c)), saturation 1.1, cool shadows / warm highlights, and
   // the 0.24 vignette.

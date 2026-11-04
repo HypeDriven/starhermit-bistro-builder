@@ -63,19 +63,9 @@ function button(b: Btn, width: number | null = null): void {
 }
 /** Buttons at their own widths in rows that wrap at `width` (CSS flex-wrap). */
 function flow(label: string, list: Btn[], width: number, align: "start" | "center" = "start", gap = 9.6): void {
-  const rows: Btn[][] = [[]];
-  let used = 0;
-  for (const b of list) {
-    const bw = Math.min(width, buttonWidth(b.text, b.style ?? PLAIN));
-    if (rows[rows.length - 1]!.length && used + gap + bw > width) { rows.push([]); used = 0; }
-    used += (rows[rows.length - 1]!.length ? gap : 0) + bw;
-    rows[rows.length - 1]!.push(b);
-  }
-  ui.column(label, () => {
-    rows.forEach((row, ri) => ui.row(`${label}-r${ri}`, () => {
-      for (const b of row) button(b, buttonWidth(b.text, b.style ?? PLAIN) > width ? width : null);
-    }, { spacing: gap, align: "center" }));
-  }, { spacing: gap, align: align === "center" ? "center" : "start", width });
+  ui.row(label, () => {
+    for (const b of list) button(b, buttonWidth(b.text, b.style ?? PLAIN) > width ? width : null);
+  }, { wrap: true, width, gap, justify: align, align: "center" });
 }
 /** Text up to `width` wide: one label when it fits, else a paragraph. */
 function para(text: string, width: number, cls?: string, id?: string, center = false): void {
@@ -342,9 +332,7 @@ function hud(L: Layout, st: State): void {
 
   // --- the room in what is left
   const f = frame();
-  const toNdcX = (lx: number): number => ((L.ox + lx * L.sc) / f.width) * 2 - 1;
-  const toNdcY = (ly: number): number => 1 - ((L.oy + ly * L.sc) / f.height) * 2;
-  render.frameRoom({ x0: toNdcX(camRect.x), x1: toNdcX(camRect.x + camRect.w), y0: toNdcY(camRect.y + camRect.h), y1: toNdcY(camRect.y) }, f.width / Math.max(1, f.height));
+  render.frameRoom({ x: L.ox + camRect.x * L.sc, y: L.oy + camRect.y * L.sc, w: Math.max(1, camRect.w * L.sc), h: Math.max(1, camRect.h * L.sc) }, f.width, f.height);
 }
 
 /** A rail (or drawer): a fixed column at x, y; its content scrolls when taller. */
