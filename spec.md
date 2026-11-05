@@ -25,8 +25,6 @@
 | `native/screens.ts` | `starhermit:ui`: header chips, objective and station rails / drawers, action tray, banner, toast, caption line, every screen |
 | `native/render.ts` | `starhermit:scene`: the room, figures, stations, camera framing into the playfield, plane-ray picking, look per graphics level |
 | `native/quality.ts` | The browser build's presets and budgets keyed by the runtime's quality tier |
-
-Low (quantum) keeps MSAA instead of the level's "off" until engine 1.36.2: engine 1.36.1 recolours fog, haze and translucent overlays without anti-aliasing.
 | `native/audio.ts` | Clips on the runtime's mixer, the rendered pad and clinks, the room-tone loop, captions |
 | `native/platform.ts` | Engine save (progress), game settings, browser-save and legacy-settings migration, invite, names, score posting |
 | `native/classic.ts` | Loads `js/*.js` as classic scripts (a `localStorage` shim over `starhermit:storage`), typed exports |
