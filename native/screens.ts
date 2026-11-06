@@ -32,12 +32,10 @@ import {
 // ------------------------------------------------------------------ layout
 interface Layout { lw: number; lh: number; sc: number; wide: boolean; portrait: boolean; shortLand: boolean; ox: number; oy: number }
 function layoutNow(): Layout {
-  const f = frame();
-  const sc = ui.preferences().scale;
-  const sa = f.safeArea;
-  const lw = Math.max(1, (f.width - sa.left - sa.right) / sc), lh = Math.max(1, (f.height - sa.top - sa.bottom) / sc);
+  const v = ui.viewport!();
+  const lw = Math.max(1, v.width), lh = Math.max(1, v.height), sc = v.scale;
   const shortLand = lw > lh && lh <= 500;
-  return { lw, lh, sc, wide: lw >= 1024, portrait: lw <= 700 && lh > lw, shortLand, ox: sa.left, oy: sa.top };
+  return { lw, lh, sc, wide: lw >= 1024, portrait: lw <= 700 && lh > lw, shortLand, ox: v.x, oy: v.y };
 }
 const lastHeight = new Map<string, number>();
 const cw = (L: Layout, max: number): number => Math.max(120, Math.min(max, L.lw - (L.portrait ? 26 : 38)));
@@ -430,7 +428,7 @@ function stationsRail(w: number, st: State): void {
 
 // ------------------------------------------------------------------ screens
 function accountLine(): string {
-  if (app.signedOut) return t("acct.signedOut");
+  if (app.signedOut) return t("starhermit.signedOut");
   const name = platform.displayName();
   if (!name) return t("acct.offline");
   const s = platform.syncState();
@@ -455,12 +453,12 @@ function titleScreen(L: Layout): void {
     ], w, "center");
     para(accountLine(), w, "mini", "account-line", true);
     const account: Btn[] = [];
-    if (!platform.signedIn()) account.push({ id: "btn-sign-in", text: t("acct.signIn"), act: () => { void requestSignIn().catch(() => undefined); } });
+    if (!platform.signedIn()) account.push({ id: "btn-sign-in", text: t("starhermit.signIn"), act: () => { void requestSignIn().catch(() => undefined); } });
     const link = platform.inviteLink();
     if (link) {
       account.push({
-        id: "btn-invite", text: t("acct.invite"),
-        act: () => { try { clipboard.writeText(link); toast(t("acct.inviteCopied")); } catch { toast(`${t("acct.inviteFailed")} ${link}`); } },
+        id: "btn-invite", text: t("starhermit.invite"),
+        act: () => { try { clipboard.writeText(link); toast(t("starhermit.inviteCopied")); } catch { toast(t("starhermit.inviteLink", { link })); } },
       });
     }
     if (account.length) flow("title-account", account, w, "center");
@@ -768,7 +766,7 @@ function resultsScreen(L: Layout): void {
     }
     if (mode !== "learn" && platform.signedIn()) {
       const lb = r.lb;
-      para(r.posting || !lb ? t("acct.lbPosting") : !lb.posted ? t("acct.lbNotPosted") : lb.rank ? t("acct.lbRank", { rank: lb.rank }) : t("acct.lbPosted"), w, "mini", "results-lb");
+      para(r.posting || !lb ? t("starhermit.leaderboardPosting") : !lb.posted ? t("starhermit.leaderboardNotPosted") : lb.rank ? t("starhermit.leaderboardRank", { rank: lb.rank }) : t("starhermit.leaderboardPosted"), w, "mini", "results-lb");
     }
     if (cfg.ranked) boardTable("results-board", r.local, Content.rivalScores(cfg), t("lb.compare"), w);
     const row: Btn[] = [{ id: "btn-again", text: t(win ? "r.again" : "r.retry"), style: ["btn", "btn-primary"], act: playAgain }];

@@ -27,14 +27,14 @@
 | `native/quality.ts` | The browser build's presets and budgets keyed by the runtime's quality tier |
 | `native/audio.ts` | Clips on the runtime's mixer, the rendered pad and clinks, the room-tone loop, captions |
 | `native/platform.ts` | Engine save (progress), game settings, browser-save and legacy-settings migration, invite, names, score posting |
-| `native/classic.ts` | Loads `js/*.js` as classic scripts (a `localStorage` shim over `starhermit:storage`), typed exports |
+| `native/classic.ts` | Loads `js/*.js` as classic scripts (the engine's `localStorage` over `starhermit:storage`), typed exports |
 | `native/i18n.ts`, `native/style.ts` | Locale from the runtime's interface language; UI styles, theme and palette tokens |
 | `js/rng.js` | mulberry32 PRNG, FNV-1a `hashString`, three derived streams (rules / decor / AV) |
 | `js/rules.js` | Pure rules engine: `createGame`, `legalActions`, `applyCommand`, `step`, `hint`, `hashState`, `serialize` |
 | `js/content.js` | 40 Journey stages, 5 lessons, 6 challenges, 3 practice paces, daily generator, 5 themes, validators, rival generator |
 | `js/store.js` | Save document shape (settings defaults, progress), checksummed wrapper, `mergeDocs`, local leaderboard, achievement definitions |
 | `js/migrate.js` | Engine save document `{ v: 1, progress }`, the browser build's cloud save and per-player settings as they carry over |
-| `js/i18n.js` | Every player-facing string in the nine locales (account lines included) |
+| `assets/strings.json` | Every player-facing string in the nine locales (the engine's `strings`; account lines are its `starhermit.*` where it has them) |
 | `tools/ui-style.css` → `assets/ui-style.json` | The browser CSS rewritten class-based; converted with `npm run css` |
 | `tools/plan.mjs`, `tools/package-web.mjs`, `tools/css.mjs`, `tools/browser-play.mjs` | Play-script service plans from the rules, packaging, CSS conversion, headless-Chrome play check |
 | `score-script.js` | StarHermit platform script (`server=`): range-checks a finished run's total and posts it to the `high-score` board |
@@ -250,7 +250,7 @@ Screens are full-window `starhermit:ui` sheets (max 720 px) that scroll when tal
 
 Nine locales ship for all player-facing text: **en-US, en-GB, es-419, es-ES, de-DE, fr-FR, fr-CA, pt-BR, it-IT**.
 
-- **Strings**: `js/i18n.js` holds the header, rails, HUD, objective, hints (from the structured `{key, vars}` of `rules.hint`), refusal reasons, toasts, announcements, captions, every screen, the station panel and upgrades, results, pause and gamepad prompts, the StarHermit account lines (`acct.*`) and the content names (40 stages, 6 challenges, 3 paces, 5 lessons with every step, 5 themes, 6 achievements). `content.js`/`store.js` keep English data; names come by id.
+- **Strings**: `assets/strings.json` holds the header, rails, HUD, objective, hints (from the structured `{key, vars}` of `rules.hint`), refusal reasons, toasts, announcements, captions, every screen, the station panel and upgrades, results, pause and gamepad prompts, the StarHermit account lines (`acct.*`) and the content names (40 stages, 6 challenges, 3 paces, 5 lessons with every step, 5 themes, 6 achievements). `content.js`/`store.js` keep English data; names come by id.
 - **Language**: the runtime's interface language (`preferences().language`: Options › Language, else the account's preferred language, else the device's) maps to the nearest shipped locale (`es-MX → es-419`, `en-AU → en-GB`, `fr → fr-FR`, `pt-PT → pt-BR`); a change applies on the next frame to every screen and the running service (the UI is rebuilt every frame). The game has no language menu of its own.
 - Colour emoji icons in the tables (🍽 💡 ⏪ ⏩ ⏸ ⏱ 🏆 🏅) are dropped where drawn (`tx`): the runtime's fonts have no colour emoji.
 - Layout tolerates expansion: chips wrap, long labels become paragraphs, upgrade labels wrap inside their buttons.
@@ -270,7 +270,7 @@ Nine locales ship for all player-facing text: **en-US, en-GB, es-419, es-ES, de-
 - **Player:** `player()` from `starhermit:platform`; the title's account line reads "Playing as <name> · progress synced / saving… / cloud sync unavailable", or "Offline — progress is stored on this device." for a guest, or the signed-out notice after `onSessionEnded`. Signing in is the runtime's: the title's **Sign in with StarHermit** calls `requestSignIn()`. **Invite a friend** (signed in) copies the prefetched `inviteLink()` with `clipboard.writeText`.
 - **Save:** progress is the game's save (`saves`, `{ v: 1, progress }`, schema 1): on the device and in the account's slot; a conflict merges both (`mergeDocs`: more Journey stars, better bests, finished lessons, larger lifetime stats, latest `lastDaily`, every achievement at its earliest unlock); a newer account copy loaded later is merged in. The browser build's cloud save (slot `game:<slug>`, the SDK's checksummed `{ sum, payload }` document) shows as foreign: its progress is merged in, its game settings kept where the account has none, and it is replaced once (`replaceForeign`). Old browser `localStorage` progress of guests cannot migrate.
 - **Settings:** the game's own options (`captions`, `theme`, `colorPalette`, `leftHanded`, `haptics`, `boardMirror`, `speed`) are `settings` (game.<key>, synced with the account). The browser build's per-player keys are read once through `settings.legacyKeys()`: the game's own carried over unless set since, the rest (volumes, mute, graphics, reduced motion, contrast, text size, `ui.language`) dropped — the runtime's Options own them — and all removed.
-- **Leaderboard:** signed in, every finished run except lessons posts its total through `score-script.js` (a practice session whose socket carries `{ type: 'result', scores: { 'high-score': total } }`); the results card shows "Leaderboard rank: #N" (or posted / not posted). Guests post nothing.
+- **Leaderboard:** signed in, every finished run except lessons posts its total through `score-script.js` (`leaderboards.submitScore`); the results card shows "Leaderboard rank: #N" (or posted / not posted). Guests post nothing.
 - **Local boards:** ranked rulesets (daily, challenges) keep a per-ruleset comparison on the device (`storage` key `bistrobuilder.leaderboards.v1`, top 100, ties by score, fewer invalid commands, shorter duration, session id) with the seeded house regulars; names of rows carrying a player id resolve through `profile()`.
 - **Daily date:** the device's UTC date (the engine has no server-time call; the browser build's `/api/v1/time` sync is gone).
 - **Lifecycle:** a hidden window pauses the service (`onSuspend`) and flushes the save; coming back shows "Service paused while you were away".

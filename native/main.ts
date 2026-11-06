@@ -557,7 +557,7 @@ platform.onSettingsChange(() => {
   applyPrefs();
   if (game && render.hasRoom()) render.build(game.state, themeNow(), game.cfg.seed);
 });
-onSessionEnded(() => { app.signedOut = true; toast(t("acct.signedOut")); });
+onSessionEnded(() => { app.signedOut = true; toast(t("starhermit.signedOut")); });
 onPlayerChange((p) => { if (p) app.signedOut = false; });
 onSuspend(() => {
   // Backgrounding pauses the service; nothing is lost.

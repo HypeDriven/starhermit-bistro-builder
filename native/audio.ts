@@ -10,16 +10,11 @@
 // bus levels (music 50 %, effects 90 %, ambience 50 %) are folded into each
 // sound's gain.
 //
-// The browser build made the pad, the clinks and the stand-in room tone with
-// Web Audio nodes; here the pad chords and the clinks are rendered once into
-// clips (createClip) with the same shapes, the room tone is the authored clip
-// looped whole (streaming it with the old loop points made headless Chrome's
-// mixer warn that a stream's turn failed), and the synthesized stand-ins it played
-// while a sample loaded are not ported: the engine's browser runtime drops
-// clip loads and plays while a synthesis graph changes (the arrow-exodus
-// port's finding). Every clip loads at start (onStart); a cue whose clip is
-// still loading is silent (its caption still shows).
-import { context, createClip, loadClip, play as playClip, type AudioClip, type Bus, type Sound } from "starhermit:audio";
+// The pad chords and the clinks are rendered once into clips by the engine's
+// OfflineAudioContext at start; the room tone is the authored clip looped whole.
+// Every clip loads at start (onStart); a cue whose clip is still loading is
+// silent (its caption still shows).
+import { OfflineAudioContext, SoundBank, context, createClip, loadClip, play as playClip, type AudioClip, type Bus, type Sound } from "starhermit:audio";
 import type { RngStream } from "./classic.ts";
 
 const LEVEL = { music: 0.5, effects: 0.9, ambience: 0.5 };
@@ -45,6 +40,8 @@ export function loadSfx(): void {
     loadClip(`sfx/${name}.opus`).then((c) => { clips.set(name, c); }, (e: unknown) => console.warn(`sfx ${name}: ${String(e)}`));
   }
   loadClip("sfx/bistro-ambience.opus").then((c) => { ambienceClip = c; }, (e: unknown) => console.warn(`ambience: ${String(e)}`));
+  Promise.all(CHORDS.map(renderChord)).then((c) => { chords = c; }, (e: unknown) => console.warn(`pad: ${String(e)}`));
+  Promise.all(CLINKS.map(renderClink)).then((clips) => { clinks = new SoundBank({ clips, bus: "effects", gain: LEVEL.ambience, pitch: 1.2, pitchJitter: 0.25 }); }, (e: unknown) => console.warn(`clinks: ${String(e)}`));
 }
 export function setOnCaption(cb: (event: string) => void): void { onCaption = cb; }
 export function setAvRng(rng: RngStream): void { avRng = rng; }
@@ -63,65 +60,44 @@ export function play(name: string): void {
 
 // -- rendered beds ------------------------------------------------------------------------
 const RATE = 11025;
-/** RBJ biquad lowpass over `x` in place (Web Audio's BiquadFilterNode, Q ≈ 0.707). */
-function lowpass(x: Float32Array, freq: number, q = Math.SQRT1_2): void {
-  const w = (2 * Math.PI * freq) / RATE, alpha = Math.sin(w) / (2 * q), c = Math.cos(w);
-  const a0 = 1 + alpha;
-  const b0 = (1 - c) / 2 / a0, b1 = (1 - c) / a0, b2 = b0, a1 = (-2 * c) / a0, a2 = (1 - alpha) / a0;
-  let x1 = 0, x2 = 0, y1 = 0, y2 = 0;
-  for (let i = 0; i < x.length; i++) {
-    const x0 = x[i]!;
-    const y0 = b0 * x0 + b1 * x1 + b2 * x2 - a1 * y1 - a2 * y2;
-    x2 = x1; x1 = x0; y2 = y1; y1 = y0;
-    x[i] = y0;
-  }
-}
 const CHORDS = [
   [261.63, 329.63, 392.0], // C E G
   [293.66, 349.23, 440.0], // D F A
   [246.94, 293.66, 392.0], // B D G
   [220.0, 261.63, 329.63], // A C E
 ];
+const CLINKS = [2000, 2600, 3200];
 /** One pad chord: a triangle root and two sines an octave down, lowpassed at
  * 650 Hz, rising to 0.045 over 1.6 s and falling to silence by 5.8 s. */
-function chordClip(chord: number[]): AudioClip {
-  const n = Math.round(6 * RATE);
-  const out = new Float32Array(n);
+async function renderChord(chord: number[]): Promise<AudioClip> {
+  const off = new OfflineAudioContext(1, Math.round(6 * RATE), RATE);
+  const lp = off.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = 650;
+  const g = off.createGain();
+  g.gain.setValueAtTime(0, 0); g.gain.linearRampToValueAtTime(0.045, 1.6); g.gain.linearRampToValueAtTime(0.0001, 5.8); g.gain.setValueAtTime(0, 5.8);
+  lp.connect(g).connect(off.destination);
   chord.forEach((freq, v) => {
-    const f = freq * 0.5;
-    const voice = new Float32Array(n);
-    for (let i = 0; i < n; i++) {
-      const ph = (f * i / RATE) % 1;
-      voice[i] = v === 0 ? 1 - 4 * Math.abs(ph - 0.5) : Math.sin(2 * Math.PI * ph);
-    }
-    lowpass(voice, 650);
-    for (let i = 0; i < n; i++) {
-      const t = i / RATE;
-      const env = t < 1.6 ? 0.045 * (t / 1.6) : t < 5.8 ? 0.045 + (0.0001 - 0.045) * ((t - 1.6) / 4.2) : 0;
-      out[i]! += voice[i]! * env;
-    }
+    const osc = off.createOscillator(); osc.type = v === 0 ? "triangle" : "sine"; osc.frequency.value = freq * 0.5;
+    osc.connect(lp); osc.start();
   });
-  return createClip([out], RATE);
+  return createClip(await off.startRendering());
 }
 /** A soft clink: a sine pinged to 0.02 in 5 ms, gone in 0.12 s. */
-function clinkClip(freq: number): AudioClip {
-  const n = Math.round(0.15 * RATE * 4);
+async function renderClink(freq: number): Promise<AudioClip> {
   const rate = RATE * 4;
-  const out = new Float32Array(n);
-  for (let i = 0; i < n; i++) {
-    const t = i / rate;
-    const env = t < 0.005 ? 0.02 * (t / 0.005) : 0.02 * Math.pow(0.0001 / 0.02, Math.min(1, (t - 0.005) / 0.115));
-    out[i] = Math.sin(2 * Math.PI * freq * t) * env;
-  }
-  return createClip([out], rate);
+  const off = new OfflineAudioContext(1, Math.round(0.15 * rate), rate);
+  const osc = off.createOscillator(); osc.frequency.value = freq;
+  const g = off.createGain();
+  g.gain.setValueAtTime(0, 0); g.gain.linearRampToValueAtTime(0.02, 0.005); g.gain.exponentialRampToValueAtTime(0.0001, 0.12);
+  osc.connect(g).connect(off.destination); osc.start();
+  return createClip(await off.startRendering());
 }
 
 let started = false;
 let paused = false;
 let ambience: Sound | null = null;
 let ambienceClip: AudioClip | null = null;
-const chords: AudioClip[] = [];
-const clinks: AudioClip[] = [];
+let chords: AudioClip[] = [];
+let clinks: SoundBank | null = null;
 let chordIdx = 0;
 let nextChord = 0;
 let nextClink = 0;
@@ -135,13 +111,12 @@ export function setPaused(on: boolean): void {
   try { ambience.fade(on ? 0 : 0.9 * LEVEL.ambience, 0.3); } catch { ambience = null; }
 }
 
-/** Each frame, once the mixer runs: one rendered clip a frame, then
- * the pad's next chord every 4.8 s and a clink every 2.5–7.5 s of mixer time. */
+/** Each frame, once the mixer runs: the pad's next chord every 4.8 s and a
+ * clink every 2.5–7.5 s of mixer time, once their clips are rendered. */
 export function update(): void {
   if (context.state !== "running" || !started) return; // starting the beds still waits for the mixer
+  if (!chords.length || !clinks) return;
   try {
-    if (chords.length < CHORDS.length) { chords.push(chordClip(CHORDS[chords.length]!)); return; }
-    if (clinks.length < 3) { clinks.push(clinkClip(2000 + clinks.length * 600)); return; }
     if (!ambience && ambienceClip) {
       // The authored 10 s room tone on the ambience level.
       ambience = playClip(ambienceClip, { bus: "effects", gain: paused ? 0 : 0.9 * LEVEL.ambience, loop: true });
@@ -158,7 +133,7 @@ export function update(): void {
     const first = nextClink === 0;
     nextClink = now + (first ? 2 : 2.5 + Math.random() * 5);
     if (!first) {
-      try { playClip(clinks[Math.floor(Math.random() * clinks.length)]!, { bus: "effects", gain: LEVEL.ambience, pitch: 0.9 + Math.random() * 0.6 }); } catch { /* full */ }
+      try { clinks.play(); } catch { /* full */ }
     }
   }
 }

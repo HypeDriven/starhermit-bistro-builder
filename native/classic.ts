@@ -1,30 +1,19 @@
 // The browser build's pure game scripts, unchanged and shared with the Node
-// tests: rng, rules, content, store and the string tables (js/*.js, UMD),
+// tests: rng, rules, content and store (js/*.js, UMD),
 // plus js/migrate.js (the engine save document and what the browser build
 // left in the account), evaluated as classic scripts so their globals
-// (BBRNG, BBRules, BBContent, BBStore, BBI18n, BBMigrate) are this module's
+// (BBRNG, BBRules, BBContent, BBStore, BBMigrate) are this module's
 // exports.
 //
-// js/store.js keeps the device's local leaderboard in `localStorage`: here
-// that is a small shim over the device's starhermit:storage, installed
-// before the scripts run. Progress is the game's save (platform.ts).
-import { storage } from "starhermit:storage";
+// js/store.js keeps the device's local leaderboard in `localStorage`: the
+// engine's, over the device's starhermit:storage, installed before the scripts
+// run (its setItem throws past the limits; store.js catches). Progress is the
+// game's save (platform.ts).
+import { installLocalStorage } from "starhermit:storage";
 import { loadClassic } from "starhermit:script";
 
-const shim = {
-  getItem(key: string): string | null {
-    try { return storage.getText(key); } catch { return null; }
-  },
-  setItem(key: string, value: string): void {
-    try { storage.set(key, String(value)); } catch (e) { console.warn(`storage ${key}: ${String(e)}`); }
-  },
-  removeItem(key: string): void {
-    try { storage.remove(key); } catch { /* gone */ }
-  },
-};
-(globalThis as unknown as { localStorage: typeof shim }).localStorage = shim;
-
-for (const f of ["js/rng.js", "js/rules.js", "js/content.js", "js/store.js", "js/i18n.js", "js/migrate.js"]) loadClassic(f);
+installLocalStorage();
+for (const f of ["js/rng.js", "js/rules.js", "js/content.js", "js/store.js", "js/migrate.js"]) loadClassic(f);
 
 // -- The shapes this client reads -------------------------------------------------
 export type Item = "capacity" | "helper" | "stove" | "expand";
@@ -100,12 +89,6 @@ interface StoreApi {
   sortEntries(e: BoardEntry[]): BoardEntry[];
 }
 interface RngApi { derive(seed: number, stream: number): RngStream; hashString(s: string): number; STREAM_DECOR: number; STREAM_AV: number }
-interface I18nApi {
-  t(key: string, vars?: Record<string, string | number> | null, fallback?: string): string;
-  setLocale(tag: string): void;
-  LOCALES: string[];
-  readonly lang: string;
-}
 interface MigrateApi {
   GAME_SETTING_KEYS: string[];
   BROWSER_SETTING_KEYS: string[];
@@ -116,10 +99,9 @@ interface MigrateApi {
   migrateSetting(key: string, value: unknown): unknown;
 }
 
-const g = globalThis as unknown as { BBRules: RulesApi; BBContent: ContentApi; BBStore: StoreApi; BBRNG: RngApi; BBI18n: I18nApi; BBMigrate: MigrateApi };
+const g = globalThis as unknown as { BBRules: RulesApi; BBContent: ContentApi; BBStore: StoreApi; BBRNG: RngApi; BBMigrate: MigrateApi };
 export const Rules = g.BBRules;
 export const Content = g.BBContent;
 export const Store = g.BBStore;
 export const RNG = g.BBRNG;
-export const I18n = g.BBI18n;
 export const Migrate = g.BBMigrate;
