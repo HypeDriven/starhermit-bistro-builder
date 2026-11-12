@@ -1,3 +1,10 @@
+'use strict';
+const REVIEWED_IDENTITIES = require('./reviewed-identities.json');
+// Only exact reviewed key/source pairs are exempt; all other English copies count.
+function isReviewedIdentity(locale, key, source) {
+  const row = REVIEWED_IDENTITIES.locales[locale]?.[key];
+  return row?.source === source && typeof row.reason === 'string' && row.reason.length > 0;
+}
 // i18n.test.js — every string the engine client (native/*.ts) shows exists in
 // the nine StarHermit locales (js/i18n.js) with the placeholders of US
 // English: the keys its code names, the keys it builds (refusal reasons,
@@ -14,7 +21,7 @@ const C = require('../js/content.js');
 const S = require('../js/store.js');
 const R = require('../js/rules.js');
 
-const LOCALES = ['en-US', 'en-GB', 'es-419', 'es-ES', 'de-DE', 'fr-FR', 'fr-CA', 'pt-BR', 'it-IT'];
+const LOCALES = ['en-US', 'en-GB', 'es-419', 'es-ES', 'de-DE', 'fr-FR', 'fr-CA', 'pt-BR', 'it-IT', 'fr-BE', 'de-BE', 'en-SG', 'en-HK', 'en-BQ', 'es-CO', 'de-IT', 'fr-IT', 'es-CL', 'es-AR', 'es-EC', 'ja-JP', 'nl-BE', 'de-BR', 'zh-SG', 'nl-NL', 'fi-FI', 'sv-FI', 'et-EE', 'vi-VN', 'ms-SG', 'ta-SG', 'zh-HK', 'yue-HK', 'id-ID', 'ru-FI', 'ru-EE', 'su-ID', 'da-DE', 'lb-BE', 'co-FR', 'eu-FR', 'ca-FR', 'oc-FR', 'sl-IT', 'fur-IT', 'ca-IT', 'oc-IT', 'ca-ES', 'eu-ES', 'gl-ES', 'bew-ID', 'km-VN'];
 const dir = path.join(__dirname, '..', 'native');
 const code = fs.readdirSync(dir).filter((f) => f.endsWith('.ts')).map((f) => fs.readFileSync(path.join(dir, f), 'utf8')).join('\n');
 const used = new Set();
@@ -55,7 +62,7 @@ test('content names in US English are the authored data', () => {
 });
 test('the non-English locales are translated', () => {
   for (const loc of LOCALES.filter((l) => !l.startsWith('en'))) {
-    const same = [...used].filter((k) => I.STRINGS[loc][k] === I.STRINGS['en-US'][k] && !/^(j|ch|theme)\./.test(k));
+    const same = ([...used].filter((k) => I.STRINGS[loc][k] === I.STRINGS['en-US'][k] && !/^(j|ch|theme)\./.test(k))).filter((key) => !isReviewedIdentity(loc, key, STRINGS['en-US'][key]));
     assert.ok(same.length < 25, `${loc}: ${same.join(', ')}`);
   }
 });

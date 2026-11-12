@@ -1,3 +1,4 @@
+import { withLanguageRender as __l10nRender } from "./l10n/menu.ts";
 // Bistro Builder on the StarHermit engine: the entry module (starhermit.txt
 // engine.entry), played natively by the StarHermit client and in browsers by
 // the engine's web runtime. The rules, content and save document are the
@@ -593,7 +594,7 @@ onUpdate((dt) => {
   if (app.banner && t0 > app.banner.until) app.banner = null;
   if (app.caption && t0 > app.caption.until) app.caption = null;
 });
-onRender((alpha) => {
+onRender(__l10nRender((alpha) => {
   const g = game;
   if (g) {
     const a = g.paused || g.over ? 1 : Math.min(1, (g.sub + alpha * g.speed) / STEPS_PER_TICK);
@@ -601,5 +602,9 @@ onRender((alpha) => {
   }
   drawScreens();
   render.frame(frameDt);
-});
+}));
 
+
+// localization-runtime:menu
+import { installLanguageMenu as __installLanguageMenu } from "./l10n/menu.ts";
+__installLanguageMenu(false);
