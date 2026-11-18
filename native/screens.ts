@@ -1,3 +1,4 @@
+import { bindings } from "starhermit:input";
 import { localizedStyle as __l10nStyle } from "./l10n/font.ts";
 // localization-runtime:attached
 import { openLocalizedOptions as __l10nOptions } from "./l10n/menu.ts";
@@ -146,7 +147,7 @@ function firstLabel(name: ScreenName): string | null {
   }
 }
 
-export function drawScreens(): void {
+function drawScreensImmediate(): void {
   const L = layoutNow();
   if (app.focusNext && app.screen && frame().frame - app.openedFrame >= 2) {
     const first = firstLabel(app.screen);
@@ -171,21 +172,6 @@ export function drawScreens(): void {
       case "paused": pauseScreen(L); break;
       case "results": resultsScreen(L); break;
     }
-  }
-  if (app.toast) {
-    // Over a screen the toast floats at the window's bottom; in play above the tray.
-    const over = !!app.screen || !g;
-    const w = over ? Math.min(L.lw * 0.9, 560) : Math.max(160, Math.min(pf.w * 0.9, 560));
-    const x = over ? (L.lw - w) / 2 : pf.x + (pf.w - w) / 2;
-    const y = over ? L.lh - 16 - toastH : pf.y + pf.h - trayH - 12 - toastH;
-    const style = app.toast.invalid ? "toast-invalid" : "toast";
-    ui.place("toast", { anchor: "top-start", x, y: Math.max(0, y) }, () => {
-      const r = ui.column("toast-box", () => {
-        if (textWidth(app.toast!.text, style) + 34 <= w) ui.style(__l10nStyle(style)).label(app.toast!.text);
-        else ui.style(__l10nStyle(style)).paragraph(app.toast!.text, w - 34);
-      }, { align: "center" });
-      toastH = r.height / L.sc;
-    }, { width: w, align: "center" });
   }
 }
 let toastH = 40;
@@ -795,4 +781,11 @@ function resultsScreen(L: Layout): void {
     row.push({ id: "btn-home", text: t("r.home"), act: () => { app.results = null; showScreen("title"); } });
     flow("results-row", row, w);
   });
+}
+
+export function drawScreens(): void {
+  if (app.screen !== "help") { drawScreensImmediate(); return; }
+  const actions = ["table1","table2","table3","table4","table5","table6","table7","table8","table9","pickup","hint","undo","speed","camera","pause","prev_action","next_action","commit"];
+  const version = JSON.stringify([(app as any).settings ?? (app as any).options ?? {}, (platform as any).options ?? {}, actions.map((action) => bindings(action))]);
+  ui.retain!("help-screen", version, drawScreensImmediate);
 }

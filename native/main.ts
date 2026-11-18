@@ -122,7 +122,7 @@ export function keysText(): string {
 
 export function announce(msg: string): void { if (msg) ui.announce(msg); }
 export function toast(text: string, invalid = false): void {
-  app.toast = { text, invalid, until: now() + 2.6 };
+  ui.toast!(text, { kind: invalid ? "warning" : "info", duration: 2.6, position: "bottom", offset: 20, style: invalid ? "toast-invalid" : "toast", announce: false });
   if (invalid) announce(t("invalid.announce", { text }));
 }
 function banner(text: string, ms: number): void { app.banner = { text, until: now() + ms / 1000 }; }
