@@ -12,7 +12,7 @@
     "metadataSource": "starhermit.txt",
     "createdAt": "2026-09-01T07:00:57.800562+00:00",
     "coverArtSource": "manifest",
-    "coverArtUpdatedAt": "2026-11-23T17:01:18.602273+00:00",
+    "coverArtUpdatedAt": "2026-11-26T11:41:27.547572+00:00",
     "submittedByUserId": "2712e04e-461b-4d23-81ae-e40b429128a8",
     "submittedByUsername": "starhermit",
     "hosting": {
@@ -22,9 +22,9 @@
       "pinnedCommitSha": null,
       "deployedCommitSha": null,
       "deployError": null,
-      "deployedAt": "2026-11-23T17:01:18.591131+00:00",
+      "deployedAt": "2026-11-26T11:41:26.345726+00:00",
       "externalLaunchUrl": null,
-      "engineVersion": "1.47.0",
+      "engineVersion": "1.50.0",
       "deployWarning": null
     },
     "description": "Cook dishes, serve hungry guests, and upgrade your bistro to meet each service's earnings goal.",
@@ -36,19 +36,19 @@
     "links": [],
     "isDisabled": false
   },
-  "publishedAt": "2026-11-23T17:01:18.717Z",
-  "sourceCommit": "c4d1405f84512997a5ab5f42e035f437be33d33c",
-  "bytesReceived": 3498898,
-  "archiveSha256": "e1949c29f849d5f609237195a72888cbd580656e99fd25ecbed4497ce925aa46",
+  "publishedAt": "2026-11-26T11:41:27.750Z",
+  "sourceCommit": "6083bf213854282830786ccd10abc6f9c7b3aaa8",
+  "bytesReceived": 3498869,
+  "archiveSha256": "fdbd725533c91a37cca07cd85f1dd033114271e16122a7c46363867e4547db41",
   "indexSha256": "df184beeca94a081f08474507f030c79c89cb0302c83890eacae9d11749e8b16",
   "result": {
     "clientPublished": true,
     "serverImageLoaded": false,
     "imageDigest": null,
-    "bytesReceived": 3498898,
+    "bytesReceived": 3498869,
     "mode": "replace",
     "filesRemoved": 0,
-    "engineVersion": "1.47.0",
+    "engineVersion": "1.50.0",
     "deployWarning": null
   },
   "liveVerification": {
