@@ -11,7 +11,7 @@
 | Genre | Real-time restaurant management / time-management puzzle |
 | Players | 1; asynchronous score comparison on ranked content |
 | Session | 90 s (Solo Sprint) to 5 min (Marathon); a Journey stage is 2–4 min; a Learn lesson under 1 min |
-| Platforms | StarHermit engine 1.52.0 script game: natively in the StarHermit client and in desktop and mobile browsers (portrait and landscape) through the engine's web runtime |
+| Platforms | StarHermit engine 1.53.0 script game: natively in the StarHermit client and in desktop and mobile browsers (portrait and landscape) through the engine's web runtime |
 | Rendering | `starhermit:scene` (the three.js model) diorama with fully procedural geometry, plus a `starhermit:ui` "station mirror" that is a complete playable text twin of the board |
 | Simulation | Fixed 100 ms tick (every 6 of the runtime's 60 Hz fixed steps), seeded, deterministic, replay envelope recorded per run |
 
@@ -19,7 +19,7 @@
 
 | Path | Role |
 |---|---|
-| `starhermit.txt` | Manifest: `engine.api=1`, `engine.entry=native/main.ts`, `engine.version=1.52.0`, `engine.minor=52`, capabilities `platform,storage,clipboard`, the 18 `control.*` actions with their `engine.gamepad.*` defaults and groups, `server=score-script.js`, `cover=cover.jpg` |
+| `starhermit.txt` | Manifest: `engine.api=1`, `engine.entry=native/main.ts`, `engine.version=1.53.0`, `engine.minor=53`, capabilities `platform,storage,clipboard`, the 18 `control.*` actions with their `engine.gamepad.*` defaults and groups, `server=score-script.js`, `cover=cover.jpg` |
 | `index.html`, `starhermit-files.json` | The engine's web loader and file index, written by `npm run package` (`starhermit package --web .`); never edited by hand |
 | `native/main.ts` | Entry: session (fixed-step ticks, command dispatch + replay envelope, rewind, lessons, urgency cues, terminal → progression, achievements, local score comparison), screen state machine, input routing (actions, gamepad action picker, board taps), lifecycle |
 | `native/screens.ts` | `starhermit:ui`: header chips, objective and station rails / drawers, action tray, banner, toast, caption line, every screen |
@@ -339,9 +339,9 @@ The string tables include complete regional variants for `fr-BE`, `de-BE`, `en-S
 
 <!-- regional-localization:end -->
 
-## Engine 1.52.0
+## Engine 1.53.0
 
-Browser play uses the StarHermit 1.52.0 web runtime on WebGPU, or WebGL 2 where WebGPU is missing. Automatic ray-traced shadows are enabled on supported Vulkan devices, with mapped-shadow fallbacks elsewhere. Packaging creates block-compressed runtime textures and compressed glTF copies, retaining original image fallbacks.
+Browser play uses the StarHermit 1.53.0 web runtime on WebGPU, or WebGL 2 where WebGPU is missing. Automatic ray-traced shadows are enabled on supported Vulkan devices, with mapped-shadow fallbacks elsewhere. Packaging creates block-compressed runtime textures and compressed glTF copies, retaining original image fallbacks.
 
 The help screen replays through retained native UI while its contents, options, layout and key bindings are unchanged.
 
@@ -350,3 +350,5 @@ Toasts use native engine stacking, styling, accessibility and lifetime managemen
 Browser rendering uses the engine's asynchronous pipeline creation so newly encountered materials do not stall the page. Native play retains the engine's synchronous pipeline behavior.
 
 Higher graphics tiers use native per-object motion blur for moving pieces and effects. Camera motion stays sharp, lower tiers omit the effect, and the runtime's Motion blur and Reduce motion preferences remain authoritative.
+
+On engine 1.53.0, browser play through WebGL 2 compiles a frame's shader programs together and holds that frame until they are linked, blends skinned meshes in one pass, reuses the window pass's depth, and uses a hardware WebGL 2 context when WebGPU's adapter is software.
