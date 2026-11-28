@@ -40,8 +40,6 @@ export function loadSfx(): void {
     loadClip(`sfx/${name}.opus`).then((c) => { clips.set(name, c); }, (e: unknown) => console.warn(`sfx ${name}: ${String(e)}`));
   }
   loadClip("sfx/bistro-ambience.opus").then((c) => { ambienceClip = c; }, (e: unknown) => console.warn(`ambience: ${String(e)}`));
-  Promise.all(CHORDS.map(renderChord)).then((c) => { chords = c; }, (e: unknown) => console.warn(`pad: ${String(e)}`));
-  Promise.all(CLINKS.map(renderClink)).then((clips) => { clinks = new SoundBank({ clips, bus: "effects", gain: LEVEL.ambience, pitch: 1.2, pitchJitter: 0.25 }); }, (e: unknown) => console.warn(`clinks: ${String(e)}`));
 }
 export function setOnCaption(cb: (event: string) => void): void { onCaption = cb; }
 export function setAvRng(rng: RngStream): void { avRng = rng; }
@@ -113,7 +111,15 @@ export function setPaused(on: boolean): void {
 
 /** Each frame, once the mixer runs: the pad's next chord every 4.8 s and a
  * clink every 2.5–7.5 s of mixer time, once their clips are rendered. */
+let __bedsStarted = false;
+function startBeds(): void {
+  if (__bedsStarted) return;
+  __bedsStarted = true;
+  Promise.all(CHORDS.map(renderChord)).then((c) => { chords = c; }, (e: unknown) => console.warn(`pad: ${String(e)}`));
+  Promise.all(CLINKS.map(renderClink)).then((clips) => { clinks = new SoundBank({ clips, bus: "effects", gain: LEVEL.ambience, pitch: 1.2, pitchJitter: 0.25 }); }, (e: unknown) => console.warn(`clinks: ${String(e)}`));
+}
 export function update(): void {
+  startBeds();
   if (context.state !== "running" || !started) return; // starting the beds still waits for the mixer
   if (!chords.length || !clinks) return;
   try {
